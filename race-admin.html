@@ -50,7 +50,6 @@
   @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
   @keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
   @media(max-width:768px){.container{padding:20px}.horse{font-size:2rem}.salesperson-info{margin-left:60px}}
-  /* Scoring editor */
   table{width:100%;border-collapse:collapse}
   th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;font-size:.95rem}
   th{background:#eef2f7;color:#2c3e50}
@@ -62,7 +61,7 @@
 <div class="container">
   <div class="header">
     <h1>🏇 Sales Team Race Track — Admin</h1>
-    <p>Edit players, scoring, and positions. Changes are saved to this browser and power the public page.</p>
+    <p>Edit players, scoring, and positions. Changes sync to the public board.</p>
   </div>
 
   <div class="track-container">
@@ -116,7 +115,7 @@
 
     <div class="control-panel" style="grid-column:1/-1">
       <h3>🧮 Scoring Editor</h3>
-      <p class="muted" style="margin-bottom:10px">Edit the quick scoring reasons. Use Apply to give points to the selected player.</p>
+      <p class="muted" style="margin-bottom:10px">Edit quick scoring reasons. Use Apply to give points to the selected player.</p>
       <div style="overflow:auto">
         <table id="rules-table">
           <thead>
@@ -130,10 +129,10 @@
           <tbody></tbody>
         </table>
       </div>
-      <div class="control-row" style="margin-top:10px">
+      <div class="control-row" style="margin-top:10px;gap:8px">
         <button class="btn btn-success" id="btn-add-rule">Add Rule</button>
         <button class="btn" id="btn-save-rules">Save Rules</button>
-        <button class="btn" id="btn-publish">Publish Rewards + Scores</button>
+        <button class="btn" id="btn-publish">Publish Now</button>
       </div>
     </div>
   </div>
@@ -145,7 +144,12 @@
 </div>
 
 <script>
-/* ---------- Config & persistence ---------- */
+/* ======= REMOTE SYNC CONFIG ======= */
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
+const WRITE_SECRET = 'CHANGE_ME_TO_MATCH_APPS_SCRIPT_SECRET';
+const REMOTE_TIMEOUT = 8000;
+/* ================================== */
+
 const TRACK_LENGTH = 30;
 const MAX_POINTS = 300;
 const MAX_PLAYERS = 15;
@@ -160,62 +164,68 @@ const DEFAULT_PLAYERS = [
 ];
 
 const DEFAULT_RULES = [
-  { reason:"Per Open",                             points: 1, type:"positive" },
-  { reason:"Per NB Dep taken",                     points: 3, type:"positive" },
-  { reason:"3hrs talk time each day",              points: 3, type:"positive" },
-  { reason:"Per Load written",                     points: 3, type:"positive" },
-  { reason:"Per settled load",                     points: 5, type:"positive" },
-  { reason:"Per settled NB",                       points: 5, type:"positive" },
-  { reason:"Most enthusiastic broker",             points: 5, type:"positive" },
-  { reason:"Best dressed broker",                  points: 5, type:"positive" },
-  { reason:"Getting 5 RSVPS for VIP",              points: 5, type:"positive" },
-  { reason:"Additional invite over 5",             points: 1, type:"positive" },
-  { reason:"First call close with deposit",        points:10, type:"positive" },
-  { reason:"Settling 4 NB or loads",               points:20, type:"positive" },
-  { reason:"Settling £100k Retail",                points:20, type:"positive" },
-  { reason:"Writing left nuts/Settle",             points:20, type:"positive" },
-  { reason:"Cancelled deal - Hit Oil Slick",       points:-5, type:"penalty"  },
-  { reason:"Late - Hit a barrier",                 points:-5, type:"penalty"  },
-  { reason:"Absent without leave - Puncture",      points:-5, type:"penalty"  },
-  { reason:"Dress code - Stewards Penalty",        points:-5, type:"penalty"  }
+  { reason:"Per Open", points:1, type:"positive" },
+  { reason:"Per NB Dep taken", points:3, type:"positive" },
+  { reason:"3hrs talk time each day", points:3, type:"positive" },
+  { reason:"Per Load written", points:3, type:"positive" },
+  { reason:"Per settled load", points:5, type:"positive" },
+  { reason:"Per settled NB", points:5, type:"positive" },
+  { reason:"Most enthusiastic broker", points:5, type:"positive" },
+  { reason:"Best dressed broker", points:5, type:"positive" },
+  { reason:"Getting 5 RSVPS for VIP", points:5, type:"positive" },
+  { reason:"Additional invite over 5", points:1, type:"positive" },
+  { reason:"First call close with deposit", points:10, type:"positive" },
+  { reason:"Settling 4 NB or loads", points:20, type:"positive" },
+  { reason:"Settling £100k Retail", points:20, type:"positive" },
+  { reason:"Writing left nuts/Settle", points:20, type:"positive" },
+  { reason:"Cancelled deal - Hit Oil Slick", points:-5, type:"penalty" },
+  { reason:"Late - Hit a barrier", points:-5, type:"penalty" },
+  { reason:"Absent without leave - Puncture", points:-5, type:"penalty" },
+  { reason:"Dress code - Stewards Penalty", points:-5, type:"penalty" }
 ];
 
 const DEFAULT_REWARDS = [
-  { points: 3,  type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' },
-  { points: 12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points: 17, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' },
-  { points: 23, type:'extra-lead',   name:'Extra Lead',     emoji:'📞' },
-  { points: 27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points: 30, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' }
+  { points:3, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:17, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:23, type:'extra-lead', name:'Extra Lead', emoji:'📞' },
+  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:30, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' }
 ];
 
-function loadPlayers(){
-  const saved = JSON.parse(localStorage.getItem("salespeople")||"null");
-  const players = saved || DEFAULT_PLAYERS;
-  return players.map(p=>({...p, points:Math.max(0,Math.min(MAX_POINTS, p.points||0)), laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
+/* Remote helpers */
+async function remoteGetState() {
+  const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET', mode: 'cors' });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 }; }
 }
-function savePlayers(){ localStorage.setItem("salespeople", JSON.stringify(salespeople)); }
-
-function loadRules(){
-  return JSON.parse(localStorage.getItem("scoringRules")||"null") || DEFAULT_RULES;
+async function remotePostState(state) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), REMOTE_TIMEOUT);
+  const res = await fetch(ENDPOINT, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type':'application/json','X-Auth': WRITE_SECRET },
+    body: JSON.stringify(state),
+    signal: controller.signal
+  }).catch(err => ({ ok:false, error:String(err) }));
+  clearTimeout(id);
+  return res && res.ok ? res : { ok:false, error:'HTTP error' };
 }
-function saveRules(){ localStorage.setItem("scoringRules", JSON.stringify(rules)); }
+function nowState(){ return { salespeople, scoringRules: rules, rewards }; }
+function debounce(fn, ms=600){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+const pushRemoteDebounced = debounce(async function(){ try{ await remotePostState(nowState()); }catch(e){} }, 700);
 
-function loadRewards(){
-  return JSON.parse(localStorage.getItem("rewards")||"null") || DEFAULT_REWARDS;
-}
-function saveRewards(){ localStorage.setItem("rewards", JSON.stringify(rewards)); }
+/* State */
+let salespeople = DEFAULT_PLAYERS.map(p=>({...p}));
+let rules = DEFAULT_RULES.map(r=>({...r}));
+let rewards = DEFAULT_REWARDS.map(r=>({...r}));
 
-/* ---------- State ---------- */
-let salespeople = loadPlayers();
-let rules = loadRules();
-let rewards = loadRewards();
+/* DOM helpers */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
 
-/* ---------- DOM helpers ---------- */
-const $ = sel => document.querySelector(sel);
-const $$ = sel => document.querySelectorAll(sel);
-
-/* ---------- Reward markers ---------- */
+/* Render */
 function renderRewardMarkers(){
   const cont = $("#reward-markers");
   cont.innerHTML = "";
@@ -231,8 +241,6 @@ function renderRewardMarkers(){
     cont.appendChild(el);
   });
 }
-
-/* ---------- Lanes / players ---------- */
 function renderLanes(){
   const lanes = $("#race-lanes");
   lanes.innerHTML = "";
@@ -248,23 +256,16 @@ function renderLanes(){
           <span class="points">${p.points} pts</span>
           ${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}
         </div>
-      </div>
-    `;
+      </div>`;
     lanes.appendChild(lane);
   });
   attachHorseClicks();
   salespeople.forEach((_,i)=>{updateHorse(i);updateInfo(i);});
   setTimeout(renderRewardMarkers,100);
 }
-
 function attachHorseClicks(){
-  $$(".horse").forEach((node,i)=>{
-    node.addEventListener("click",()=>{
-      changePoints(i, +5, "Horse click +5");
-    });
-  });
+  $$(".horse").forEach((node,i)=>node.addEventListener("click",()=>changePoints(i, +5, "Horse +5")));
 }
-
 function updateHorse(i){
   const horse = document.getElementById(`horse-${i}`);
   const lane = document.getElementById(`lane-${i}`);
@@ -281,7 +282,6 @@ function updateHorse(i){
     setTimeout(()=>{horse.style.animation="none"},1200);
   }
 }
-
 function updateInfo(i){
   const lane = document.getElementById(`lane-${i}`);
   if(!lane) return;
@@ -292,16 +292,13 @@ function updateInfo(i){
     <div>
       <span class="points">${p.points} pts</span>
       ${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}
-    </div>
-  `;
+    </div>`;
   const badge = info.querySelector(".points");
   if(p.laps>=3) badge.style.background="#27ae60";
   else if(p.laps>=1) badge.style.background="#f39c12";
   else if(p.points>=20) badge.style.background="#e67e22";
   else badge.style.background="#3498db";
 }
-
-/* ---------- Leaderboard ---------- */
 function renderLeaderboard(){
   const lb = $("#leaderboard-content");
   lb.innerHTML = "";
@@ -319,37 +316,34 @@ function renderLeaderboard(){
         <span>${p.name}</span>
         ${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}
       </div>
-      <div><span class="points">${p.points} pts</span></div>
-    `;
+      <div><span class="points">${p.points} pts</span></div>`;
     lb.appendChild(div);
   });
 }
 
-/* ---------- Dropdowns ---------- */
+/* Dropdowns */
 function refreshDropdowns(){
   const sel = $("#salesperson-select");
   const rem = $("#remove-player-select");
   sel.innerHTML = "";
   rem.innerHTML = '<option value="">Select player</option>';
   salespeople.forEach((p,i)=>{
-    const o1 = document.createElement("option");
-    o1.value = i; o1.textContent = p.name; sel.appendChild(o1);
-    const o2 = document.createElement("option");
-    o2.value = i; o2.textContent = p.name; rem.appendChild(o2);
+    const a=document.createElement("option"); a.value=i; a.textContent=p.name; sel.appendChild(a);
+    const b=document.createElement("option"); b.value=i; b.textContent=p.name; rem.appendChild(b);
   });
 }
 
-/* ---------- Notifications ---------- */
+/* Notifications */
 function toast(name, delta, reason){
   const n = document.createElement("div");
   const positive = delta>0;
   n.className = `reason-notification ${positive?'positive':'penalty'}`;
   n.innerHTML = `${positive?'🎉':'⚠️'} <strong>${name}</strong><br>${delta>0?`+${delta}`:delta} points: ${reason}`;
   document.body.appendChild(n);
-  setTimeout(()=>n.remove(), 3500);
+  setTimeout(()=>n.remove(), 3200);
 }
 
-/* ---------- Points logic ---------- */
+/* Points logic */
 function setPoints(index, newPoints, reason="Set"){
   const p = salespeople[index];
   const old = p.points;
@@ -357,40 +351,28 @@ function setPoints(index, newPoints, reason="Set"){
   p.laps = Math.floor(p.points/TRACK_LENGTH);
   checkRewards(index, old, p.points);
   updateHorse(index); updateInfo(index); renderLeaderboard();
-  savePlayers();
+  pushRemoteDebounced();
   toast(p.name, p.points-old, reason);
 }
-
-function changePoints(index, delta, reason="Adjust"){
-  setPoints(index, (salespeople[index].points||0)+delta, reason);
-}
-
+function changePoints(index, delta, reason="Adjust"){ setPoints(index, (salespeople[index].points||0)+delta, reason); }
 function checkRewards(idx, oldPts, newPts){
   const player = salespeople[idx];
   const oldLapPos = oldPts % TRACK_LENGTH;
   const newLapPos = newPts % TRACK_LENGTH;
   const oldLap = Math.floor(oldPts/TRACK_LENGTH);
   const newLap = Math.floor(newPts/TRACK_LENGTH);
-  if(newLap>oldLap){
-    // Lap toast
-    toast(player.name, 0, `Completed Lap ${newLap}`);
-  }
+  if(newLap>oldLap){ toast(player.name, 0, `Completed Lap ${newLap}`); }
   rewards.forEach(r=>{
     if(oldLapPos < r.points && newLapPos >= r.points){
-      // Reward message
       toast(player.name, 0, `Reward: ${r.emoji} ${r.name}`);
-      if(r.type==="move-forward"){
-        setTimeout(()=>{
-          setPoints(idx, Math.min(MAX_POINTS, player.points+2), "Reward bonus +2");
-        },800);
-      }
+      if(r.type==="move-forward"){ setTimeout(()=>setPoints(idx, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); }
     }
   });
 }
 
-/* ---------- Rules (Scoring Editor) ---------- */
+/* Rules editor */
 function renderRulesTable(){
-  const tbody = $("#rules-table tbody");
+  const tbody = document.querySelector("#rules-table tbody");
   tbody.innerHTML = "";
   rules.forEach((rule,i)=>{
     const tr = document.createElement("tr");
@@ -407,24 +389,20 @@ function renderRulesTable(){
         <button class="btn" data-act="apply" data-i="${i}">Apply</button>
         <button class="btn" data-act="dup" data-i="${i}">Duplicate</button>
         <button class="btn btn-danger" data-act="del" data-i="${i}">Delete</button>
-      </td>
-    `;
+      </td>`;
     tbody.appendChild(tr);
   });
-
-  // Wire inputs
-  tbody.querySelectorAll("input,select").forEach((el, rowIdx)=>{
-    el.addEventListener("change", (e)=>{
+  tbody.querySelectorAll("input,select").forEach(el=>{
+    el.addEventListener("change",(e)=>{
       const tr = e.target.closest("tr");
       const idx = Array.from(tbody.children).indexOf(tr);
       const key = e.target.dataset.k;
       let val = e.target.value;
       if(key==="points") val = parseInt(val||0,10);
       rules[idx] = {...rules[idx], [key]: val};
+      pushRemoteDebounced();
     });
   });
-
-  // Wire buttons
   tbody.querySelectorAll("button").forEach(btn=>{
     btn.addEventListener("click",(e)=>{
       const act = e.target.dataset.act;
@@ -432,112 +410,89 @@ function renderRulesTable(){
       if(act==="apply"){
         const sel = $("#salesperson-select");
         const idx = parseInt(sel.value,10);
-        if(Number.isNaN(idx)){ alert("Select a player first"); return; }
+        if(Number.isNaN(idx)) return alert("Select a player first");
         const r = rules[i];
         changePoints(idx, parseInt(r.points,10), r.reason);
       } else if(act==="dup"){
-        rules.splice(i+1,0,{...rules[i]});
-        renderRulesTable();
+        rules.splice(i+1,0,{...rules[i]}); renderRulesTable(); pushRemoteDebounced();
       } else if(act==="del"){
-        rules.splice(i,1);
-        renderRulesTable();
+        rules.splice(i,1); renderRulesTable(); pushRemoteDebounced();
       }
     });
   });
 }
 
-$("#btn-add-rule").addEventListener("click",()=>{
-  rules.push({reason:"New reason", points:1, type:"positive"});
-  renderRulesTable();
-});
-$("#btn-save-rules").addEventListener("click",()=>{
-  saveRules();
-  alert("Rules saved.");
+/* Buttons */
+document.getElementById("btn-add-rule").addEventListener("click",()=>{ rules.push({reason:"New reason", points:1, type:"positive"}); renderRulesTable(); pushRemoteDebounced(); });
+document.getElementById("btn-save-rules").addEventListener("click",async()=>{ await remotePostState(nowState()); alert("Rules saved to server."); });
+
+document.getElementById("btn-publish").addEventListener("click", async ()=>{
+  const res = await remotePostState(nowState());
+  if(res && res.ok) alert("Published to server.");
+  else alert("Publish failed. Check WRITE_SECRET or CORS.");
 });
 
-/* ---------- Publish ---------- */
-$("#btn-publish").addEventListener("click",()=>{
-  savePlayers();
-  saveRules();
-  saveRewards();
-  alert("Published. Open the public page to view the locked display.");
-});
-
-/* ---------- Manage players ---------- */
-$("#btn-add-player").addEventListener("click",()=>{
-  const name = ($("#new-player-name").value||"").trim();
+document.getElementById("btn-add-player").addEventListener("click",()=>{
+  const name = (document.getElementById("new-player-name").value||"").trim();
   if(!name) return alert("Enter a player name");
   if(salespeople.length>=MAX_PLAYERS) return alert("Max players reached");
   if(salespeople.some(p=>p.name.toLowerCase()===name.toLowerCase())) return alert("Name already exists");
-  salespeople.push({
-    name, points:0, laps:0, horse: HORSES[salespeople.length % HORSES.length]
-  });
-  $("#new-player-name").value="";
-  refreshDropdowns();
-  renderLanes();
-  renderLeaderboard();
-  savePlayers();
+  salespeople.push({ name, points:0, laps:0, horse: HORSES[salespeople.length % HORSES.length] });
+  document.getElementById("new-player-name").value="";
+  refreshDropdowns(); renderLanes(); renderLeaderboard(); pushRemoteDebounced();
 });
-
-$("#btn-remove-player").addEventListener("click",()=>{
-  const idx = parseInt($("#remove-player-select").value,10);
+document.getElementById("btn-remove-player").addEventListener("click",()=>{
+  const idx = parseInt(document.getElementById("remove-player-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
   if(salespeople.length<=1) return alert("Cannot remove last player");
   const name = salespeople[idx].name;
   if(confirm(`Remove ${name}?`)){
     salespeople.splice(idx,1);
-    refreshDropdowns();
-    renderLanes();
-    renderLeaderboard();
-    savePlayers();
+    refreshDropdowns(); renderLanes(); renderLeaderboard(); pushRemoteDebounced();
   }
 });
 
-/* ---------- Point buttons ---------- */
-$("#btn-set").addEventListener("click",()=>{
-  const idx = parseInt($("#salesperson-select").value,10);
+document.getElementById("btn-set").addEventListener("click",()=>{
+  const idx = parseInt(document.getElementById("salesperson-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
-  const val = parseInt($("#points-input").value,10);
+  const val = parseInt(document.getElementById("points-input").value,10);
   if(Number.isNaN(val)) return alert("Enter a number");
   setPoints(idx, val, "Manual set");
 });
-$("#btn-add5").addEventListener("click",()=>{
-  const idx = parseInt($("#salesperson-select").value,10);
+document.getElementById("btn-add5").addEventListener("click",()=>{
+  const idx = parseInt(document.getElementById("salesperson-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
   changePoints(idx, +5, "Quick +5");
 });
-$("#btn-sub5").addEventListener("click",()=>{
-  const idx = parseInt($("#salesperson-select").value,10);
+document.getElementById("btn-sub5").addEventListener("click",()=>{
+  const idx = parseInt(document.getElementById("salesperson-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
   changePoints(idx, -5, "Quick -5");
 });
-$("#btn-all-plus10").addEventListener("click",()=>{
-  salespeople.forEach((_,i)=>changePoints(i, +10, "All +10"));
+document.getElementById("btn-all-plus10").addEventListener("click",()=>{ salespeople.forEach((_,i)=>changePoints(i, +10, "All +10")); });
+document.getElementById("btn-reset").addEventListener("click",()=>{
+  if(!confirm("Reset all to 0")) return;
+  salespeople.forEach((p,i)=>{ p.points=0; p.laps=0; updateHorse(i); updateInfo(i); });
+  renderLeaderboard(); pushRemoteDebounced();
 });
-$("#btn-reset").addEventListener("click",()=>{
-  if(!confirm("Reset all to 0?")) return;
-  salespeople.forEach((p,i)=>{p.points=0;p.laps=0;updateHorse(i);updateInfo(i);});
-  renderLeaderboard();
-  savePlayers();
-});
-$("#btn-randomize").addEventListener("click",()=>{
-  salespeople.forEach((p,i)=>{
-    p.points = Math.floor(Math.random()*91); // 0..90
-    p.laps = Math.floor(p.points/TRACK_LENGTH);
-    updateHorse(i); updateInfo(i);
-  });
-  renderLeaderboard();
-  savePlayers();
+document.getElementById("btn-randomize").addEventListener("click",()=>{
+  salespeople.forEach((p,i)=>{ p.points = Math.floor(Math.random()*91); p.laps = Math.floor(p.points/TRACK_LENGTH); updateHorse(i); updateInfo(i); });
+  renderLeaderboard(); pushRemoteDebounced();
 });
 
-/* ---------- Rewards stay editable in code (optional advanced UI later) ---------- */
-
-/* ---------- Init ---------- */
-function init(){
-  renderLanes();
-  renderLeaderboard();
-  refreshDropdowns();
-  renderRulesTable();
+/* Init: pull from server first */
+async function init(){
+  try{
+    const remote = await remoteGetState();
+    if(remote && remote.salespeople && remote.salespeople.length){
+      salespeople = remote.salespeople;
+      rules = remote.scoringRules && remote.scoringRules.length ? remote.scoringRules : rules;
+      rewards = remote.rewards && remote.rewards.length ? remote.rewards : rewards;
+      // compute laps
+      salespeople = salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
+    }
+  }catch(e){ console.warn("Remote load failed, using defaults.", e); }
+  renderLanes(); renderLeaderboard(); refreshDropdowns(); renderRulesTable();
 }
 window.addEventListener("DOMContentLoaded", init);
 </script>
