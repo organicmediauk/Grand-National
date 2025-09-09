@@ -146,7 +146,7 @@
 <script>
 /* ======= REMOTE SYNC CONFIG ======= */
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
-const WRITE_SECRET = 'CHANGE_ME_TO_MATCH_APPS_SCRIPT_SECRET';
+const WRITE_SECRET = 'CHANGE_ME_TO_MATCH_APPS_SCRIPT_SECRET'; /* must match Apps Script SECRET */
 const REMOTE_TIMEOUT = 8000;
 /* ================================== */
 
@@ -162,7 +162,6 @@ const DEFAULT_PLAYERS = [
   { name:"Emma Wilson", points:0, horse:"🐎", laps:0 },
   { name:"David Park", points:0, horse:"🐴", laps:0 }
 ];
-
 const DEFAULT_RULES = [
   { reason:"Per Open", points:1, type:"positive" },
   { reason:"Per NB Dep taken", points:3, type:"positive" },
@@ -183,21 +182,36 @@ const DEFAULT_RULES = [
   { reason:"Absent without leave - Puncture", points:-5, type:"penalty" },
   { reason:"Dress code - Stewards Penalty", points:-5, type:"penalty" }
 ];
-
 const DEFAULT_REWARDS = [
   { points:3, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
   { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
   { points:17, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
-  { points:23, type:'extra-lead', name:'Extra Lead', emoji:'📞' },
+  { points:23, type:'extra-lead',   name:'Extra Lead',     emoji:'📞' },
   { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points:30, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' }
+  { points:30, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' }
 ];
+
+let salespeople = DEFAULT_PLAYERS.map(p=>({...p}));
+let rules = DEFAULT_RULES.map(r=>({...r}));
+let rewards = DEFAULT_REWARDS.map(r=>({...r}));
+
+/* Robust parser for HTML-wrapped JSON */
+function parseMaybeWrappedJSON(text){
+  try { return JSON.parse(text); } catch {}
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    try { return JSON.parse(text.slice(start, end+1)); } catch {}
+  }
+  return null;
+}
 
 /* Remote helpers */
 async function remoteGetState() {
   const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET', mode: 'cors' });
   const text = await res.text();
-  try { return JSON.parse(text); } catch { return { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 }; }
+  const obj = parseMaybeWrappedJSON(text);
+  return obj || { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 };
 }
 async function remotePostState(state) {
   const controller = new AbortController();
@@ -216,22 +230,17 @@ function nowState(){ return { salespeople, scoringRules: rules, rewards }; }
 function debounce(fn, ms=600){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 const pushRemoteDebounced = debounce(async function(){ try{ await remotePostState(nowState()); }catch(e){} }, 700);
 
-/* State */
-let salespeople = DEFAULT_PLAYERS.map(p=>({...p}));
-let rules = DEFAULT_RULES.map(r=>({...r}));
-let rewards = DEFAULT_REWARDS.map(r=>({...r}));
-
 /* DOM helpers */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-/* Render */
+/* UI renderers */
 function renderRewardMarkers(){
   const cont = $("#reward-markers");
   cont.innerHTML = "";
   const track = $(".track-container");
   const trackWidth = track.offsetWidth - 100;
-  rewards.forEach(r=>{
+  (rewards||[]).forEach(r=>{
     const el = document.createElement("div");
     el.className = `reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
@@ -263,9 +272,7 @@ function renderLanes(){
   salespeople.forEach((_,i)=>{updateHorse(i);updateInfo(i);});
   setTimeout(renderRewardMarkers,100);
 }
-function attachHorseClicks(){
-  $$(".horse").forEach((node,i)=>node.addEventListener("click",()=>changePoints(i, +5, "Horse +5")));
-}
+function attachHorseClicks(){ $$(".horse").forEach((n,i)=>n.addEventListener("click",()=>changePoints(i,+5,"Horse +5"))); }
 function updateHorse(i){
   const horse = document.getElementById(`horse-${i}`);
   const lane = document.getElementById(`lane-${i}`);
@@ -283,8 +290,7 @@ function updateHorse(i){
   }
 }
 function updateInfo(i){
-  const lane = document.getElementById(`lane-${i}`);
-  if(!lane) return;
+  const lane = document.getElementById(`lane-${i}`); if(!lane) return;
   const p = salespeople[i];
   const info = lane.querySelector(".salesperson-info");
   info.innerHTML = `
@@ -320,8 +326,6 @@ function renderLeaderboard(){
     lb.appendChild(div);
   });
 }
-
-/* Dropdowns */
 function refreshDropdowns(){
   const sel = $("#salesperson-select");
   const rem = $("#remove-player-select");
@@ -362,7 +366,7 @@ function checkRewards(idx, oldPts, newPts){
   const oldLap = Math.floor(oldPts/TRACK_LENGTH);
   const newLap = Math.floor(newPts/TRACK_LENGTH);
   if(newLap>oldLap){ toast(player.name, 0, `Completed Lap ${newLap}`); }
-  rewards.forEach(r=>{
+  (rewards||[]).forEach(r=>{
     if(oldLapPos < r.points && newLapPos >= r.points){
       toast(player.name, 0, `Reward: ${r.emoji} ${r.name}`);
       if(r.type==="move-forward"){ setTimeout(()=>setPoints(idx, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); }
@@ -408,7 +412,7 @@ function renderRulesTable(){
       const act = e.target.dataset.act;
       const i = parseInt(e.target.dataset.i,10);
       if(act==="apply"){
-        const sel = $("#salesperson-select");
+        const sel = document.getElementById("salesperson-select");
         const idx = parseInt(sel.value,10);
         if(Number.isNaN(idx)) return alert("Select a player first");
         const r = rules[i];
@@ -480,16 +484,24 @@ document.getElementById("btn-randomize").addEventListener("click",()=>{
   renderLeaderboard(); pushRemoteDebounced();
 });
 
-/* Init: pull from server first */
+/* Init: pull from server; if empty, bootstrap defaults to server */
 async function init(){
   try{
     const remote = await remoteGetState();
-    if(remote && remote.salespeople && remote.salespeople.length){
-      salespeople = remote.salespeople;
-      rules = remote.scoringRules && remote.scoringRules.length ? remote.scoringRules : rules;
-      rewards = remote.rewards && remote.rewards.length ? remote.rewards : rewards;
-      // compute laps
-      salespeople = salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
+    let changed = false;
+    if(remote && Array.isArray(remote.salespeople) && remote.salespeople.length){
+      salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
+    } else {
+      changed = true; // bootstrap players
+    }
+    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length){
+      rules = remote.scoringRules;
+    } else { changed = true; }
+    if(remote && Array.isArray(remote.rewards) && remote.rewards.length){
+      rewards = remote.rewards;
+    } else { changed = true; }
+    if(changed){
+      await remotePostState(nowState()); // seed the server so public never blanks
     }
   }catch(e){ console.warn("Remote load failed, using defaults.", e); }
   renderLanes(); renderLeaderboard(); refreshDropdowns(); renderRulesTable();
