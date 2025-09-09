@@ -288,7 +288,13 @@ function checkRewards(i, oldPts, newPts){
   const player=salespeople[i]; const oldLap=~~(oldPts/TRACK_LENGTH), newLap=~~(newPts/TRACK_LENGTH);
   const oldPos=oldPts%TRACK_LENGTH, newPos=newPts%TRACK_LENGTH;
   if(newLap>oldLap) toast(player.name,0,`Completed Lap ${newLap}`);
-  (rewards||[]).forEach(r=>{ if(oldPos<r.points && newPos>=r.points){ toast(player.name,0,`Reward: ${r.emoji} ${r.name}`); if(r.type==="move-forward"){ setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); } }});
+  // Trigger only when landing exactly on the marker (not when passing)
+  (rewards||[]).forEach(r=>{ 
+    if (newPos === r.points) { 
+      toast(player.name,0,`Reward: ${r.emoji} ${r.name}`); 
+      if(r.type==="move-forward"){ setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); } 
+    } 
+  });
 }
 function renderRulesTable(){
   const tbody=document.querySelector("#rules-table tbody"); tbody.innerHTML="";
