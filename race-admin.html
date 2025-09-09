@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Sales Team Race Track — Admin</title>
 <style>
+  /* (styles unchanged from your working version) */
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);min-height:100vh;padding:20px}
   .container{max-width:1200px;margin:0 auto;background:#fff;border-radius:20px;padding:30px;box-shadow:0 20px 40px rgba(0,0,0,.1)}
@@ -144,11 +145,11 @@
 </div>
 
 <script>
-/* ======= REMOTE SYNC CONFIG (matches Apps Script) ======= */
+/* ======= REMOTE SYNC CONFIG ======= */
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
-const WRITE_SECRET = 'uAnG8Q2vN6!Zr3pX0hJf5wL4cS9tEeB';   // must equal SECRET in Code.gs
+const SECRET  = 'uAnG8Q2vN6!Zr3pX0hJf5wL4cS9tEeB';   // must match Code.gs SECRET
 const REMOTE_TIMEOUT = 8000;
-/* ======================================================== */
+/* ================================== */
 
 const TRACK_LENGTH = 30;
 const MAX_POINTS = 300;
@@ -195,32 +196,22 @@ let salespeople = DEFAULT_PLAYERS.map(p=>({...p}));
 let rules = DEFAULT_RULES.map(r=>({...r}));
 let rewards = DEFAULT_REWARDS.map(r=>({...r}));
 
-/* Robust parser for HTML-wrapped JSON */
-function parseMaybeWrappedJSON(text){
-  try { return JSON.parse(text); } catch {}
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) {
-    try { return JSON.parse(text.slice(start, end+1)); } catch {}
-  }
-  return null;
-}
-
-/* Remote helpers */
+/* Remote helpers: simple requests (no preflight), pure JSON responses */
 async function remoteGetState() {
-  const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET', mode: 'cors' });
+  const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET' });
+  // If Apps Script ever returns HTML by accident, fail gracefully:
   const text = await res.text();
-  const obj = parseMaybeWrappedJSON(text);
-  return obj || { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 };
+  try { return JSON.parse(text); } catch { return { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 }; }
 }
 async function remotePostState(state) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), REMOTE_TIMEOUT);
+  // NOTE: text/plain + no custom headers => no CORS preflight
+  const body = JSON.stringify({ ...state, secret: SECRET });
   const res = await fetch(ENDPOINT, {
     method: 'POST',
-    mode: 'cors',
-    headers: { 'Content-Type':'application/json','X-Auth': WRITE_SECRET },
-    body: JSON.stringify(state),
+    headers: { 'Content-Type': 'text/plain' },
+    body,
     signal: controller.signal
   }).catch(err => ({ ok:false, error:String(err) }));
   clearTimeout(id);
@@ -230,62 +221,51 @@ function nowState(){ return { salespeople, scoringRules: rules, rewards }; }
 function debounce(fn, ms=600){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 const pushRemoteDebounced = debounce(async function(){ try{ await remotePostState(nowState()); }catch(e){} }, 700);
 
-/* DOM helpers */
+/* DOM helpers (renderers/controls) — same as your current version */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-/* UI renderers (lanes, rewards, leaderboard) — identical to earlier version */
-function renderRewardMarkers(){
-  const cont = $("#reward-markers"); cont.innerHTML = "";
-  const track = $(".track-container"); const trackWidth = track.offsetWidth - 100;
-  (rewards||[]).forEach(r=>{
-    const el = document.createElement("div");
-    el.className = `reward-marker ${r.type}`;
+function renderRewardMarkers(){ /* unchanged */ 
+  const cont = $("#reward-markers"); cont.innerHTML=""; const track = $(".track-container"); const w = track.offsetWidth - 100;
+  (rewards||[]).forEach(r=>{ const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pct = r.points/TRACK_LENGTH; const pos = 30 + (pct * (trackWidth - 60));
-    el.style.left = pos + "px"; cont.appendChild(el);
-  });
+    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px"; cont.appendChild(el); });
 }
 function renderLanes(){
-  const lanes = $("#race-lanes"); lanes.innerHTML = "";
+  const lanes = $("#race-lanes"); lanes.innerHTML="";
   salespeople.forEach((p,i)=>{
-    const lane = document.createElement("div"); lane.className="lane"; lane.id=`lane-${i}`;
-    lane.innerHTML = `
-      <div class="horse" id="horse-${i}" title="Click to +5">${p.horse}</div>
-      <div class="salesperson-info">
-        <span class="salesperson-name">${p.name}</span>
-        <div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div>
-      </div>`;
+    const lane=document.createElement("div"); lane.className="lane"; lane.id=`lane-${i}`;
+    lane.innerHTML = `<div class="horse" id="horse-${i}" title="Click to +5">${p.horse}</div>
+      <div class="salesperson-info"><span class="salesperson-name">${p.name}</span>
+      <div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div></div>`;
     lanes.appendChild(lane);
   });
-  attachHorseClicks();
-  salespeople.forEach((_,i)=>{updateHorse(i);updateInfo(i);});
+  attachHorseClicks(); salespeople.forEach((_,i)=>{updateHorse(i); updateInfo(i);});
   setTimeout(renderRewardMarkers,100);
 }
 function attachHorseClicks(){ $$(".horse").forEach((n,i)=>n.addEventListener("click",()=>changePoints(i,+5,"Horse +5"))); }
 function updateHorse(i){
   const horse=document.getElementById(`horse-${i}`), lane=document.getElementById(`lane-${i}`); if(!horse||!lane) return;
-  const laneWidth=lane.offsetWidth-100, finishOffset=40, lapPos=salespeople[i].points%TRACK_LENGTH;
-  const pct=lapPos/TRACK_LENGTH, maxPos=laneWidth-finishOffset, newPos=15+(pct*maxPos);
-  horse.style.left=newPos+"px"; if(lapPos===0 && salespeople[i].points>0){ horse.style.animation="bounce .5s ease-in-out infinite alternate"; setTimeout(()=>{horse.style.animation="none"},1200); }
+  const w=lane.offsetWidth-100, finish=40; const lapPos=salespeople[i].points%TRACK_LENGTH;
+  const newPos = 15 + (lapPos/TRACK_LENGTH)*(w-finish); horse.style.left=newPos+"px";
+  if(lapPos===0 && salespeople[i].points>0){ horse.style.animation="bounce .5s ease-in-out infinite alternate"; setTimeout(()=>{horse.style.animation="none"},1200); }
 }
 function updateInfo(i){
-  const lane=document.getElementById(`lane-${i}`); if(!lane) return;
-  const p=salespeople[i]; const info=lane.querySelector(".salesperson-info");
+  const lane=document.getElementById(`lane-${i}`); if(!lane) return; const p=salespeople[i];
+  const info=lane.querySelector(".salesperson-info");
   info.innerHTML = `<span class="salesperson-name">${p.name}</span><div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div>`;
   const badge=info.querySelector(".points");
   if(p.laps>=3) badge.style.background="#27ae60"; else if(p.laps>=1) badge.style.background="#f39c12";
   else if(p.points>=20) badge.style.background="#e67e22"; else badge.style.background="#3498db";
 }
 function renderLeaderboard(){
-  const lb=$("#leaderboard-content"); lb.innerHTML="";
-  const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
+  const lb=$("#leaderboard-content"); lb.innerHTML=""; const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
   sorted.forEach((p,idx)=>{
-    const div=document.createElement("div"); div.className="leaderboard-item";
-    if(idx===0&&p.points>0) div.classList.add("first"); else if(idx===1&&p.points>0) div.classList.add("second"); else if(idx===2&&p.points>0) div.classList.add("third");
+    const d=document.createElement("div"); d.className="leaderboard-item";
+    if(idx===0 && p.points>0) d.classList.add("first"); else if(idx===1 && p.points>0) d.classList.add("second"); else if(idx===2 && p.points>0) d.classList.add("third");
     const medal=idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
-    div.innerHTML = `<div><span class="position">${medal}</span><span>${p.name}</span>${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}</div><div><span class="points">${p.points} pts</span></div>`;
-    lb.appendChild(div);
+    d.innerHTML = `<div><span class="position">${medal}</span><span>${p.name}</span>${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}</div><div><span class="points">${p.points} pts</span></div>`;
+    lb.appendChild(d);
   });
 }
 function refreshDropdowns(){
@@ -293,45 +273,30 @@ function refreshDropdowns(){
   salespeople.forEach((p,i)=>{ const a=document.createElement("option"); a.value=i; a.textContent=p.name; sel.appendChild(a);
     const b=document.createElement("option"); b.value=i; b.textContent=p.name; rem.appendChild(b); });
 }
-
-/* Notifications */
 function toast(name, delta, reason){
-  const n=document.createElement("div"), positive=delta>0;
-  n.className=`reason-notification ${positive?'positive':'penalty'}`;
-  n.innerHTML=`${positive?'🎉':'⚠️'} <strong>${name}</strong><br>${delta>0?`+${delta}`:delta} points: ${reason}`;
-  document.body.appendChild(n); setTimeout(()=>n.remove(),3200);
+  const n=document.createElement("div"), pos=delta>0; n.className=`reason-notification ${pos?'positive':'penalty'}`;
+  n.innerHTML=`${pos?'🎉':'⚠️'} <strong>${name}</strong><br>${delta>0?`+${delta}`:delta} points: ${reason}`; document.body.appendChild(n);
+  setTimeout(()=>n.remove(),3200);
 }
 
-/* Points logic */
-function setPoints(index, newPoints, reason="Set"){
-  const p=salespeople[index], old=p.points;
-  p.points=Math.max(0,Math.min(MAX_POINTS,newPoints|0)); p.laps=Math.floor(p.points/TRACK_LENGTH);
-  checkRewards(index,old,p.points); updateHorse(index); updateInfo(index); renderLeaderboard(); pushRemoteDebounced(); toast(p.name,p.points-old,reason);
+function setPoints(i, val, reason="Set"){
+  const p=salespeople[i], old=p.points; p.points=Math.max(0,Math.min(MAX_POINTS,val|0)); p.laps=Math.floor(p.points/TRACK_LENGTH);
+  checkRewards(i, old, p.points); updateHorse(i); updateInfo(i); renderLeaderboard(); pushRemoteDebounced(); toast(p.name, p.points-old, reason);
 }
-function changePoints(index, delta, reason="Adjust"){ setPoints(index,(salespeople[index].points||0)+delta,reason); }
-function checkRewards(idx, oldPts, newPts){
-  const player=salespeople[idx], oldLapPos=oldPts%TRACK_LENGTH, newLapPos=newPts%TRACK_LENGTH;
-  const oldLap=Math.floor(oldPts/TRACK_LENGTH), newLap=Math.floor(newPts/TRACK_LENGTH);
-  if(newLap>oldLap){ toast(player.name,0,`Completed Lap ${newLap}`); }
-  (rewards||[]).forEach(r=>{
-    if(oldLapPos<r.points && newLapPos>=r.points){ toast(player.name,0,`Reward: ${r.emoji} ${r.name}`);
-      if(r.type==="move-forward"){ setTimeout(()=>setPoints(idx,Math.min(MAX_POINTS,player.points+2),"Reward +2"),800); }
-    }
-  });
+function changePoints(i, delta, reason="Adjust"){ setPoints(i,(salespeople[i].points||0)+delta,reason); }
+function checkRewards(i, oldPts, newPts){
+  const player=salespeople[i]; const oldLap=~~(oldPts/TRACK_LENGTH), newLap=~~(newPts/TRACK_LENGTH);
+  const oldPos=oldPts%TRACK_LENGTH, newPos=newPts%TRACK_LENGTH;
+  if(newLap>oldLap) toast(player.name,0,`Completed Lap ${newLap}`);
+  (rewards||[]).forEach(r=>{ if(oldPos<r.points && newPos>=r.points){ toast(player.name,0,`Reward: ${r.emoji} ${r.name}`); if(r.type==="move-forward"){ setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); } }});
 }
-
-/* Rules editor */
 function renderRulesTable(){
   const tbody=document.querySelector("#rules-table tbody"); tbody.innerHTML="";
   rules.forEach((rule,i)=>{
     const tr=document.createElement("tr");
-    tr.innerHTML = `
-      <td><input type="text" value="${rule.reason}" data-k="reason" /></td>
+    tr.innerHTML=`<td><input type="text" value="${rule.reason}" data-k="reason" /></td>
       <td><input type="number" value="${rule.points}" data-k="points" /></td>
-      <td><select data-k="type">
-            <option value="positive"${rule.type==="positive"?" selected":""}>positive</option>
-            <option value="penalty"${rule.type==="penalty"?" selected":""}>penalty</option>
-          </select></td>
+      <td><select data-k="type"><option value="positive"${rule.type==="positive"?" selected":""}>positive</option><option value="penalty"${rule.type==="penalty"?" selected":""}>penalty</option></select></td>
       <td style="display:flex;gap:8px">
         <button class="btn" data-act="apply" data-i="${i}">Apply</button>
         <button class="btn" data-act="dup" data-i="${i}">Duplicate</button>
@@ -341,7 +306,7 @@ function renderRulesTable(){
   });
   tbody.querySelectorAll("input,select").forEach(el=>{
     el.addEventListener("change",(e)=>{
-      const tr=e.target.closest("tr"), idx=Array.from(tbody.children).indexOf(tr), key=e.target.dataset.k;
+      const tr=e.target.closest("tr"), idx=[...tbody.children].indexOf(tr), key=e.target.dataset.k;
       let val=e.target.value; if(key==="points") val=parseInt(val||0,10);
       rules[idx]={...rules[idx],[key]:val}; pushRemoteDebounced();
     });
@@ -363,7 +328,7 @@ function renderRulesTable(){
 document.getElementById("btn-add-rule").addEventListener("click",()=>{ rules.push({reason:"New reason", points:1, type:"positive"}); renderRulesTable(); pushRemoteDebounced(); });
 document.getElementById("btn-save-rules").addEventListener("click", async ()=>{ await remotePostState(nowState()); alert("Rules saved to server."); });
 document.getElementById("btn-publish").addEventListener("click", async ()=>{
-  const res=await remotePostState(nowState()); if(res && res.ok) alert("Published to server."); else alert("Publish failed. Check WRITE_SECRET or CORS.");
+  const res=await remotePostState(nowState()); if(res && res.ok) alert("Published to server."); else alert("Publish failed. Check SECRET and deployment.");
 });
 document.getElementById("btn-add-player").addEventListener("click",()=>{
   const name=(document.getElementById("new-player-name").value||"").trim();
@@ -409,16 +374,16 @@ document.getElementById("btn-randomize").addEventListener("click",()=>{
   renderLeaderboard(); pushRemoteDebounced();
 });
 
-/* Init: pull from server; if empty, bootstrap defaults */
+/* Init: load remote; if empty, seed remote so public isn't blank */
 async function init(){
   try{
     const remote = await remoteGetState();
     let seed=false;
     if(remote && Array.isArray(remote.salespeople) && remote.salespeople.length){
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
-    } else seed=true;
-    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length) rules = remote.scoringRules; else seed=true;
-    if(remote && Array.isArray(remote.rewards) && remote.rewards.length) rewards = remote.rewards; else seed=true;
+    } else seed = true;
+    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length) rules = remote.scoringRules; else seed = true;
+    if(remote && Array.isArray(remote.rewards) && remote.rewards.length) rewards = remote.rewards; else seed = true;
     if(seed){ await remotePostState(nowState()); }
   }catch(e){ console.warn("Remote load failed, using defaults.", e); }
   renderLanes(); renderLeaderboard(); refreshDropdowns(); renderRulesTable();
