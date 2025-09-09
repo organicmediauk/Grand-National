@@ -80,47 +80,34 @@ const DEFAULT_REWARDS = [
 let salespeople = DEFAULT_PLAYERS.map(p=>({...p}));
 let rewards = DEFAULT_REWARDS.map(r=>({...r}));
 
-/* Robust parser: handles HTML-wrapped JSON from Apps Script */
 function parseMaybeWrappedJSON(text){
   try { return JSON.parse(text); } catch {}
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) {
-    try { return JSON.parse(text.slice(start, end+1)); } catch {}
-  }
+  const start = text.indexOf('{'); const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) { try { return JSON.parse(text.slice(start, end+1)); } catch {} }
   return null;
 }
-
 async function remoteGetState() {
   const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method:'GET', mode:'cors' });
   const text = await res.text();
   const obj = parseMaybeWrappedJSON(text);
-  return obj || { salespeople: [], rewards: [], updatedAt: 0 };
+  return obj || { salespeople: [], rewards: [] };
 }
 
 function generateRewardMarkers() {
-  const markers = document.getElementById("reward-markers");
-  markers.innerHTML = "";
-  const track = document.querySelector(".track-container");
-  const trackWidth = track.offsetWidth - 100;
+  const markers = document.getElementById("reward-markers"); markers.innerHTML = "";
+  const track = document.querySelector(".track-container"); const trackWidth = track.offsetWidth - 100;
   (rewards||[]).forEach(r=>{
     const el = document.createElement("div");
     el.className = `reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pct = r.points/TRACK_LENGTH;
-    const pos = 30 + (pct * (trackWidth - 60));
-    el.style.left = pos + "px";
-    markers.appendChild(el);
+    const pct = r.points/TRACK_LENGTH; const pos = 30 + (pct * (trackWidth - 60));
+    el.style.left = pos + "px"; markers.appendChild(el);
   });
 }
-
 function generateLanes() {
-  const lanes = document.getElementById("race-lanes");
-  lanes.innerHTML = "";
+  const lanes = document.getElementById("race-lanes"); lanes.innerHTML = "";
   salespeople.forEach((p,i)=>{
-    const lane = document.createElement("div");
-    lane.className = "lane";
-    lane.id = `lane-${i}`;
+    const lane = document.createElement("div"); lane.className = "lane"; lane.id = `lane-${i}`;
     lane.innerHTML = `
       <div class="horse" id="horse-${i}">${p.horse||"🐎"}</div>
       <div class="salesperson-info">
@@ -132,42 +119,23 @@ function generateLanes() {
   salespeople.forEach((_,i)=>updateHorsePosition(i));
   setTimeout(generateRewardMarkers,100);
 }
-
 function updateHorsePosition(i){
-  const horse = document.getElementById(`horse-${i}`);
-  const lane = document.getElementById(`lane-${i}`);
-  if(!horse||!lane) return;
-  const laneWidth = lane.offsetWidth - 100;
-  const finishOffset = 40;
-  const lapPos = (salespeople[i].points||0) % TRACK_LENGTH;
-  const pct = lapPos / TRACK_LENGTH;
-  const maxPos = laneWidth - finishOffset;
-  const newPos = 15 + (pct * maxPos);
-  horse.style.left = newPos + "px";
-  if(lapPos===0 && (salespeople[i].points||0)>0){
-    horse.style.animation = "bounce .5s ease-in-out infinite alternate";
-    setTimeout(()=>{horse.style.animation="none"},1200);
-  }
+  const horse=document.getElementById(`horse-${i}`), lane=document.getElementById(`lane-${i}`); if(!horse||!lane) return;
+  const laneWidth=lane.offsetWidth-100, finishOffset=40, lapPos=(salespeople[i].points||0)%TRACK_LENGTH;
+  const pct=lapPos/TRACK_LENGTH, maxPos=laneWidth-finishOffset, newPos=15+(pct*maxPos);
+  horse.style.left=newPos+"px";
+  if(lapPos===0 && (salespeople[i].points||0)>0){ horse.style.animation="bounce .5s ease-in-out infinite alternate"; setTimeout(()=>{horse.style.animation="none"},1200); }
 }
-
 function updateLeaderboard(){
-  const lb = document.getElementById("leaderboard-content");
-  lb.innerHTML = "";
-  const sorted = [...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
+  const lb=document.getElementById("leaderboard-content"); lb.innerHTML="";
+  const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
   sorted.forEach((p,idx)=>{
-    const div = document.createElement("div");
-    div.className = "leaderboard-item";
+    const div=document.createElement("div"); div.className="leaderboard-item";
     if(idx===0 && p.points>0) div.classList.add("first");
     else if(idx===1 && p.points>0) div.classList.add("second");
     else if(idx===2 && p.points>0) div.classList.add("third");
-    const medal = idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
-    div.innerHTML = `
-      <div>
-        <span class="position">${medal}</span>
-        <span>${p.name}</span>
-        ${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}
-      </div>
-      <div style="opacity:.7;font-size:.95rem">Positioned on track</div>`;
+    const medal=idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
+    div.innerHTML = `<div><span class="position">${medal}</span><span>${p.name}</span>${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}</div><div style="opacity:.7;font-size:.95rem">Positioned on track</div>`;
     lb.appendChild(div);
   });
 }
@@ -175,16 +143,12 @@ function updateLeaderboard(){
 async function refreshFromRemote(){
   try{
     const remote = await remoteGetState();
-    // If server has players, use them; else keep defaults (prevents blank)
     if(remote && Array.isArray(remote.salespeople) && remote.salespeople.length){
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
     }
-    if (remote && Array.isArray(remote.rewards) && remote.rewards.length) {
-      rewards = remote.rewards;
-    }
+    if(remote && Array.isArray(remote.rewards) && remote.rewards.length){ rewards = remote.rewards; }
   }catch(e){ console.warn("Public refresh failed", e); }
-  generateLanes();
-  updateLeaderboard();
+  generateLanes(); updateLeaderboard();
 }
 
 window.addEventListener("DOMContentLoaded", async ()=>{
