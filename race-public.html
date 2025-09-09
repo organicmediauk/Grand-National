@@ -38,7 +38,8 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>🏆 Elizabeth Xi Bauer Grand National</h1>
+      <h1>🏆 Sales Team Race Track</h1>
+      <p>Live standings. Actions and numeric points are hidden.</p>
     </div>
 
     <div class="track-container">
@@ -55,46 +56,40 @@
   </div>
 
 <script>
-/* ---------- Shared settings (must match admin) ---------- */
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
+const REFRESH_MS = 8000;
+
 const TRACK_LENGTH = 30;
-const DEFAULT_PLAYERS = [
-  { name:"Alex Johnson", points:0, horse:"🐎", laps:0 },
-  { name:"Sarah Chen", points:0, horse:"🐴", laps:0 },
-  { name:"Mike Rodriguez", points:0, horse:"🏇", laps:0 },
-  { name:"Emma Wilson", points:0, horse:"🐎", laps:0 },
-  { name:"David Park", points:0, horse:"🐴", laps:0 }
-];
+
 const DEFAULT_REWARDS = [
-  { points: 3,  type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' },
-  { points: 12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points: 17, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' },
-  { points: 23, type:'extra-lead',   name:'Extra Lead',     emoji:'📞' },
-  { points: 27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points: 30, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' }
+  { points:3, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:17, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:23, type:'extra-lead', name:'Extra Lead', emoji:'📞' },
+  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:30, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' }
 ];
 
-/* ---------- Load state from localStorage (written by admin) ---------- */
-function loadState() {
-  let players = JSON.parse(localStorage.getItem("salespeople")||"null") || DEFAULT_PLAYERS;
-  let rewards = JSON.parse(localStorage.getItem("rewards")||"null") || DEFAULT_REWARDS;
-  // Recompute laps defensively
-  players = players.map(p => ({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
-  return { players, rewards };
+let salespeople = [];
+let rewards = DEFAULT_REWARDS.map(r=>({...r}));
+
+async function remoteGetState() {
+  const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method:'GET', mode:'cors' });
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch { return { salespeople: [], rewards: [], updatedAt: 0 }; }
 }
 
-let { players: salespeople, rewards } = loadState();
-
-/* ---------- Render ---------- */
 function generateRewardMarkers() {
   const markers = document.getElementById("reward-markers");
   markers.innerHTML = "";
   const track = document.querySelector(".track-container");
   const trackWidth = track.offsetWidth - 100;
-  rewards.forEach(r => {
+  (rewards||[]).forEach(r=>{
     const el = document.createElement("div");
     el.className = `reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pct = r.points / TRACK_LENGTH;
+    const pct = r.points/TRACK_LENGTH;
     const pos = 30 + (pct * (trackWidth - 60));
     el.style.left = pos + "px";
     markers.appendChild(el);
@@ -104,20 +99,18 @@ function generateRewardMarkers() {
 function generateLanes() {
   const lanes = document.getElementById("race-lanes");
   lanes.innerHTML = "";
-  salespeople.forEach((p,i) => {
+  salespeople.forEach((p,i)=>{
     const lane = document.createElement("div");
     lane.className = "lane";
     lane.id = `lane-${i}`;
     lane.innerHTML = `
-      <div class="horse" id="horse-${i}">${p.horse}</div>
+      <div class="horse" id="horse-${i}">${p.horse||"🐎"}</div>
       <div class="salesperson-info">
         <span class="salesperson-name">${p.name}</span>
         <div>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div>
-      </div>
-    `;
+      </div>`;
     lanes.appendChild(lane);
   });
-  // Place horses (no click handlers in public)
   salespeople.forEach((_,i)=>updateHorsePosition(i));
   setTimeout(generateRewardMarkers,100);
 }
@@ -133,6 +126,10 @@ function updateHorsePosition(i){
   const maxPos = laneWidth - finishOffset;
   const newPos = 15 + (pct * maxPos);
   horse.style.left = newPos + "px";
+  if(lapPos===0 && (salespeople[i].points||0)>0){
+    horse.style.animation = "bounce .5s ease-in-out infinite alternate";
+    setTimeout(()=>{horse.style.animation="none"},1200);
+  }
 }
 
 function updateLeaderboard(){
@@ -146,32 +143,32 @@ function updateLeaderboard(){
     else if(idx===1 && p.points>0) div.classList.add("second");
     else if(idx===2 && p.points>0) div.classList.add("third");
     const medal = idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
-    // Public: no numeric points shown
     div.innerHTML = `
       <div>
         <span class="position">${medal}</span>
         <span>${p.name}</span>
         ${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}
       </div>
-      <div style="opacity:.7;font-size:.95rem">Positioned on track</div>
-    `;
+      <div style="opacity:.7;font-size:.95rem">Positioned on track</div>`;
     lb.appendChild(div);
   });
 }
 
-/* ---------- Init ---------- */
-window.addEventListener("DOMContentLoaded",()=>{
-  generateLanes();
-  updateLeaderboard();
-});
+async function refreshFromRemote(){
+  try{
+    const remote = await remoteGetState();
+    if(remote && Array.isArray(remote.salespeople)){
+      salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
+      rewards = Array.isArray(remote.rewards) && remote.rewards.length ? remote.rewards : rewards;
+      generateLanes();
+      updateLeaderboard();
+    }
+  }catch(e){ console.warn("Public refresh failed", e); }
+}
 
-/* ---------- Listen for admin updates (optional, same tab) ---------- */
-window.addEventListener("storage",(e)=>{
-  if(e.key==="salespeople"||e.key==="rewards"){
-    ({players:salespeople,rewards}=loadState());
-    generateLanes();
-    updateLeaderboard();
-  }
+window.addEventListener("DOMContentLoaded", async ()=>{
+  await refreshFromRemote();
+  setInterval(refreshFromRemote, REFRESH_MS);
 });
 </script>
 </body>
