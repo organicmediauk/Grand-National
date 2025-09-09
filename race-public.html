@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Sales Team Race Track — Public</title>
 <style>
-  /* (styles trimmed for brevity; same visual as before) */
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);min-height:100vh;padding:20px}
   .container{max-width:1200px;margin:0 auto;background:#fff;border-radius:20px;padding:30px;box-shadow:0 20px 40px rgba(0,0,0,.1)}
@@ -25,6 +24,7 @@
   .horse{font-size:2.5rem;transition:all .5s ease;position:absolute;left:15px;z-index:10;user-select:none;cursor:default}
   .salesperson-info{background:rgba(255,255,255,.92);border-radius:8px;padding:10px 15px;margin-left:80px;flex:1;display:flex;justify-content:space-between;align-items:center}
   .salesperson-name{font-weight:bold;color:#2c3e50;font-size:1.05rem}
+  .points{background:#3498db;color:#fff;padding:5px 12px;border-radius:20px;font-weight:bold;margin-right:8px}
   .laps{background:#f39c12;color:#fff;padding:3px 8px;border-radius:15px;font-size:.9rem;margin-left:8px}
   .leaderboard{background:#f8f9fa;border-radius:12px;padding:20px;border:2px solid #e9ecef}
   .leaderboard h3{color:#2c3e50;text-align:center;margin-bottom:12px}
@@ -40,7 +40,8 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>Elizabeth Xi Bauer Grand National</h1>
+      <h1>🏆 Sales Team Race Track</h1>
+      <p>Live standings with points.</p>
     </div>
 
     <div class="track-container">
@@ -73,7 +74,6 @@ let rewards = [
 
 async function remoteGetState() {
   const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method:'GET' });
-  // Expecting JSON from ContentService:
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { salespeople: [], rewards: [] }; }
 }
@@ -89,6 +89,7 @@ function generateRewardMarkers() {
     el.style.left = pos + "px"; markers.appendChild(el);
   });
 }
+
 function generateLanes() {
   const lanes = document.getElementById("race-lanes"); lanes.innerHTML = "";
   (salespeople||[]).forEach((p,i)=>{
@@ -97,30 +98,44 @@ function generateLanes() {
       <div class="horse" id="horse-${i}">${p.horse||"🐎"}</div>
       <div class="salesperson-info">
         <span class="salesperson-name">${p.name}</span>
-        <div>${(p.laps||0)>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div>
+        <div>
+          <span class="points">${p.points ?? 0} pts</span>
+          ${(p.laps||0)>0?`<span class="laps">Lap ${p.laps}</span>`:""}
+        </div>
       </div>`;
     lanes.appendChild(lane);
   });
   (salespeople||[]).forEach((_,i)=>updateHorsePosition(i));
   setTimeout(generateRewardMarkers,100);
 }
+
 function updateHorsePosition(i){
   const horse=document.getElementById(`horse-${i}`), lane=document.getElementById(`lane-${i}`); if(!horse||!lane) return;
   const w=lane.offsetWidth-100, finish=40, lapPos=(salespeople[i].points||0)%TRACK_LENGTH;
   horse.style.left = (15 + (lapPos/TRACK_LENGTH)*(w-finish)) + "px";
   if(lapPos===0 && (salespeople[i].points||0)>0){ horse.style.animation="bounce .5s ease-in-out infinite alternate"; setTimeout(()=>{horse.style.animation="none"},1200); }
 }
+
 function updateLeaderboard(){
   const lb=document.getElementById("leaderboard-content"); lb.innerHTML="";
   const sorted=[...(salespeople||[])].sort((a,b)=> b.laps - a.laps || b.points - a.points);
   sorted.forEach((p,idx)=>{
     const div=document.createElement("div"); div.className="leaderboard-item";
-    if(idx===0 && p.points>0) div.classList.add("first"); else if(idx===1 && p.points>0) div.classList.add("second"); else if(idx===2 && p.points>0) div.classList.add("third");
+    if(idx===0 && p.points>0) div.classList.add("first");
+    else if(idx===1 && p.points>0) div.classList.add("second");
+    else if(idx===2 && p.points>0) div.classList.add("third");
     const medal=idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
-    div.innerHTML = `<div><span class="position">${medal}</span><span>${p.name}</span>${(p.laps||0)>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}</div><div style="opacity:.7;font-size:.95rem">Positioned on track</div>`;
+    div.innerHTML = `
+      <div>
+        <span class="position">${medal}</span>
+        <span>${p.name}</span>
+        ${(p.laps||0)>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}
+      </div>
+      <div><span class="points">${p.points ?? 0} pts</span></div>`;
     lb.appendChild(div);
   });
 }
+
 async function refreshFromRemote(){
   try{
     const remote = await remoteGetState();
