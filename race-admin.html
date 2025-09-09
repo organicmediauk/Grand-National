@@ -144,11 +144,11 @@
 </div>
 
 <script>
-/* ======= REMOTE SYNC CONFIG ======= */
+/* ======= REMOTE SYNC CONFIG (matches Apps Script) ======= */
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
-const WRITE_SECRET = 'CHANGE_ME_TO_MATCH_APPS_SCRIPT_SECRET'; /* must match Apps Script SECRET */
+const WRITE_SECRET = 'uAnG8Q2vN6!Zr3pX0hJf5wL4cS9tEeB';   // must equal SECRET in Code.gs
 const REMOTE_TIMEOUT = 8000;
-/* ================================== */
+/* ======================================================== */
 
 const TRACK_LENGTH = 30;
 const MAX_POINTS = 300;
@@ -234,37 +234,27 @@ const pushRemoteDebounced = debounce(async function(){ try{ await remotePostStat
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-/* UI renderers */
+/* UI renderers (lanes, rewards, leaderboard) — identical to earlier version */
 function renderRewardMarkers(){
-  const cont = $("#reward-markers");
-  cont.innerHTML = "";
-  const track = $(".track-container");
-  const trackWidth = track.offsetWidth - 100;
+  const cont = $("#reward-markers"); cont.innerHTML = "";
+  const track = $(".track-container"); const trackWidth = track.offsetWidth - 100;
   (rewards||[]).forEach(r=>{
     const el = document.createElement("div");
     el.className = `reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pct = r.points/TRACK_LENGTH;
-    const pos = 30 + (pct * (trackWidth - 60));
-    el.style.left = pos + "px";
-    cont.appendChild(el);
+    const pct = r.points/TRACK_LENGTH; const pos = 30 + (pct * (trackWidth - 60));
+    el.style.left = pos + "px"; cont.appendChild(el);
   });
 }
 function renderLanes(){
-  const lanes = $("#race-lanes");
-  lanes.innerHTML = "";
+  const lanes = $("#race-lanes"); lanes.innerHTML = "";
   salespeople.forEach((p,i)=>{
-    const lane = document.createElement("div");
-    lane.className = "lane";
-    lane.id = `lane-${i}`;
+    const lane = document.createElement("div"); lane.className="lane"; lane.id=`lane-${i}`;
     lane.innerHTML = `
       <div class="horse" id="horse-${i}" title="Click to +5">${p.horse}</div>
       <div class="salesperson-info">
         <span class="salesperson-name">${p.name}</span>
-        <div>
-          <span class="points">${p.points} pts</span>
-          ${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}
-        </div>
+        <div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div>
       </div>`;
     lanes.appendChild(lane);
   });
@@ -274,121 +264,74 @@ function renderLanes(){
 }
 function attachHorseClicks(){ $$(".horse").forEach((n,i)=>n.addEventListener("click",()=>changePoints(i,+5,"Horse +5"))); }
 function updateHorse(i){
-  const horse = document.getElementById(`horse-${i}`);
-  const lane = document.getElementById(`lane-${i}`);
-  if(!horse||!lane) return;
-  const laneWidth = lane.offsetWidth - 100;
-  const finishOffset = 40;
-  const lapPos = salespeople[i].points % TRACK_LENGTH;
-  const pct = lapPos / TRACK_LENGTH;
-  const maxPos = laneWidth - finishOffset;
-  const newPos = 15 + (pct * maxPos);
-  horse.style.left = newPos + "px";
-  if(lapPos===0 && salespeople[i].points>0){
-    horse.style.animation = "bounce .5s ease-in-out infinite alternate";
-    setTimeout(()=>{horse.style.animation="none"},1200);
-  }
+  const horse=document.getElementById(`horse-${i}`), lane=document.getElementById(`lane-${i}`); if(!horse||!lane) return;
+  const laneWidth=lane.offsetWidth-100, finishOffset=40, lapPos=salespeople[i].points%TRACK_LENGTH;
+  const pct=lapPos/TRACK_LENGTH, maxPos=laneWidth-finishOffset, newPos=15+(pct*maxPos);
+  horse.style.left=newPos+"px"; if(lapPos===0 && salespeople[i].points>0){ horse.style.animation="bounce .5s ease-in-out infinite alternate"; setTimeout(()=>{horse.style.animation="none"},1200); }
 }
 function updateInfo(i){
-  const lane = document.getElementById(`lane-${i}`); if(!lane) return;
-  const p = salespeople[i];
-  const info = lane.querySelector(".salesperson-info");
-  info.innerHTML = `
-    <span class="salesperson-name">${p.name}</span>
-    <div>
-      <span class="points">${p.points} pts</span>
-      ${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}
-    </div>`;
-  const badge = info.querySelector(".points");
-  if(p.laps>=3) badge.style.background="#27ae60";
-  else if(p.laps>=1) badge.style.background="#f39c12";
-  else if(p.points>=20) badge.style.background="#e67e22";
-  else badge.style.background="#3498db";
+  const lane=document.getElementById(`lane-${i}`); if(!lane) return;
+  const p=salespeople[i]; const info=lane.querySelector(".salesperson-info");
+  info.innerHTML = `<span class="salesperson-name">${p.name}</span><div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div>`;
+  const badge=info.querySelector(".points");
+  if(p.laps>=3) badge.style.background="#27ae60"; else if(p.laps>=1) badge.style.background="#f39c12";
+  else if(p.points>=20) badge.style.background="#e67e22"; else badge.style.background="#3498db";
 }
 function renderLeaderboard(){
-  const lb = $("#leaderboard-content");
-  lb.innerHTML = "";
-  const sorted = [...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
+  const lb=$("#leaderboard-content"); lb.innerHTML="";
+  const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
   sorted.forEach((p,idx)=>{
-    const div = document.createElement("div");
-    div.className="leaderboard-item";
-    if(idx===0 && p.points>0) div.classList.add("first");
-    else if(idx===1 && p.points>0) div.classList.add("second");
-    else if(idx===2 && p.points>0) div.classList.add("third");
-    const medal = idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
-    div.innerHTML = `
-      <div>
-        <span class="position">${medal}</span>
-        <span>${p.name}</span>
-        ${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}
-      </div>
-      <div><span class="points">${p.points} pts</span></div>`;
+    const div=document.createElement("div"); div.className="leaderboard-item";
+    if(idx===0&&p.points>0) div.classList.add("first"); else if(idx===1&&p.points>0) div.classList.add("second"); else if(idx===2&&p.points>0) div.classList.add("third");
+    const medal=idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
+    div.innerHTML = `<div><span class="position">${medal}</span><span>${p.name}</span>${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}</div><div><span class="points">${p.points} pts</span></div>`;
     lb.appendChild(div);
   });
 }
 function refreshDropdowns(){
-  const sel = $("#salesperson-select");
-  const rem = $("#remove-player-select");
-  sel.innerHTML = "";
-  rem.innerHTML = '<option value="">Select player</option>';
-  salespeople.forEach((p,i)=>{
-    const a=document.createElement("option"); a.value=i; a.textContent=p.name; sel.appendChild(a);
-    const b=document.createElement("option"); b.value=i; b.textContent=p.name; rem.appendChild(b);
-  });
+  const sel=$("#salesperson-select"), rem=$("#remove-player-select"); sel.innerHTML=""; rem.innerHTML='<option value="">Select player</option>';
+  salespeople.forEach((p,i)=>{ const a=document.createElement("option"); a.value=i; a.textContent=p.name; sel.appendChild(a);
+    const b=document.createElement("option"); b.value=i; b.textContent=p.name; rem.appendChild(b); });
 }
 
 /* Notifications */
 function toast(name, delta, reason){
-  const n = document.createElement("div");
-  const positive = delta>0;
-  n.className = `reason-notification ${positive?'positive':'penalty'}`;
-  n.innerHTML = `${positive?'🎉':'⚠️'} <strong>${name}</strong><br>${delta>0?`+${delta}`:delta} points: ${reason}`;
-  document.body.appendChild(n);
-  setTimeout(()=>n.remove(), 3200);
+  const n=document.createElement("div"), positive=delta>0;
+  n.className=`reason-notification ${positive?'positive':'penalty'}`;
+  n.innerHTML=`${positive?'🎉':'⚠️'} <strong>${name}</strong><br>${delta>0?`+${delta}`:delta} points: ${reason}`;
+  document.body.appendChild(n); setTimeout(()=>n.remove(),3200);
 }
 
 /* Points logic */
 function setPoints(index, newPoints, reason="Set"){
-  const p = salespeople[index];
-  const old = p.points;
-  p.points = Math.max(0, Math.min(MAX_POINTS, newPoints|0));
-  p.laps = Math.floor(p.points/TRACK_LENGTH);
-  checkRewards(index, old, p.points);
-  updateHorse(index); updateInfo(index); renderLeaderboard();
-  pushRemoteDebounced();
-  toast(p.name, p.points-old, reason);
+  const p=salespeople[index], old=p.points;
+  p.points=Math.max(0,Math.min(MAX_POINTS,newPoints|0)); p.laps=Math.floor(p.points/TRACK_LENGTH);
+  checkRewards(index,old,p.points); updateHorse(index); updateInfo(index); renderLeaderboard(); pushRemoteDebounced(); toast(p.name,p.points-old,reason);
 }
-function changePoints(index, delta, reason="Adjust"){ setPoints(index, (salespeople[index].points||0)+delta, reason); }
+function changePoints(index, delta, reason="Adjust"){ setPoints(index,(salespeople[index].points||0)+delta,reason); }
 function checkRewards(idx, oldPts, newPts){
-  const player = salespeople[idx];
-  const oldLapPos = oldPts % TRACK_LENGTH;
-  const newLapPos = newPts % TRACK_LENGTH;
-  const oldLap = Math.floor(oldPts/TRACK_LENGTH);
-  const newLap = Math.floor(newPts/TRACK_LENGTH);
-  if(newLap>oldLap){ toast(player.name, 0, `Completed Lap ${newLap}`); }
+  const player=salespeople[idx], oldLapPos=oldPts%TRACK_LENGTH, newLapPos=newPts%TRACK_LENGTH;
+  const oldLap=Math.floor(oldPts/TRACK_LENGTH), newLap=Math.floor(newPts/TRACK_LENGTH);
+  if(newLap>oldLap){ toast(player.name,0,`Completed Lap ${newLap}`); }
   (rewards||[]).forEach(r=>{
-    if(oldLapPos < r.points && newLapPos >= r.points){
-      toast(player.name, 0, `Reward: ${r.emoji} ${r.name}`);
-      if(r.type==="move-forward"){ setTimeout(()=>setPoints(idx, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); }
+    if(oldLapPos<r.points && newLapPos>=r.points){ toast(player.name,0,`Reward: ${r.emoji} ${r.name}`);
+      if(r.type==="move-forward"){ setTimeout(()=>setPoints(idx,Math.min(MAX_POINTS,player.points+2),"Reward +2"),800); }
     }
   });
 }
 
 /* Rules editor */
 function renderRulesTable(){
-  const tbody = document.querySelector("#rules-table tbody");
-  tbody.innerHTML = "";
+  const tbody=document.querySelector("#rules-table tbody"); tbody.innerHTML="";
   rules.forEach((rule,i)=>{
-    const tr = document.createElement("tr");
+    const tr=document.createElement("tr");
     tr.innerHTML = `
       <td><input type="text" value="${rule.reason}" data-k="reason" /></td>
       <td><input type="number" value="${rule.points}" data-k="points" /></td>
-      <td>
-        <select data-k="type">
-          <option value="positive"${rule.type==="positive"?" selected":""}>positive</option>
-          <option value="penalty"${rule.type==="penalty"?" selected":""}>penalty</option>
-        </select>
-      </td>
+      <td><select data-k="type">
+            <option value="positive"${rule.type==="positive"?" selected":""}>positive</option>
+            <option value="penalty"${rule.type==="penalty"?" selected":""}>penalty</option>
+          </select></td>
       <td style="display:flex;gap:8px">
         <button class="btn" data-act="apply" data-i="${i}">Apply</button>
         <button class="btn" data-act="dup" data-i="${i}">Duplicate</button>
@@ -398,46 +341,32 @@ function renderRulesTable(){
   });
   tbody.querySelectorAll("input,select").forEach(el=>{
     el.addEventListener("change",(e)=>{
-      const tr = e.target.closest("tr");
-      const idx = Array.from(tbody.children).indexOf(tr);
-      const key = e.target.dataset.k;
-      let val = e.target.value;
-      if(key==="points") val = parseInt(val||0,10);
-      rules[idx] = {...rules[idx], [key]: val};
-      pushRemoteDebounced();
+      const tr=e.target.closest("tr"), idx=Array.from(tbody.children).indexOf(tr), key=e.target.dataset.k;
+      let val=e.target.value; if(key==="points") val=parseInt(val||0,10);
+      rules[idx]={...rules[idx],[key]:val}; pushRemoteDebounced();
     });
   });
   tbody.querySelectorAll("button").forEach(btn=>{
     btn.addEventListener("click",(e)=>{
-      const act = e.target.dataset.act;
-      const i = parseInt(e.target.dataset.i,10);
+      const act=e.target.dataset.act, i=parseInt(e.target.dataset.i,10);
       if(act==="apply"){
-        const sel = document.getElementById("salesperson-select");
-        const idx = parseInt(sel.value,10);
+        const sel=document.getElementById("salesperson-select"); const idx=parseInt(sel.value,10);
         if(Number.isNaN(idx)) return alert("Select a player first");
-        const r = rules[i];
-        changePoints(idx, parseInt(r.points,10), r.reason);
-      } else if(act==="dup"){
-        rules.splice(i+1,0,{...rules[i]}); renderRulesTable(); pushRemoteDebounced();
-      } else if(act==="del"){
-        rules.splice(i,1); renderRulesTable(); pushRemoteDebounced();
-      }
+        const r=rules[i]; changePoints(idx, parseInt(r.points,10), r.reason);
+      } else if(act==="dup"){ rules.splice(i+1,0,{...rules[i]}); renderRulesTable(); pushRemoteDebounced(); }
+      else if(act==="del"){ rules.splice(i,1); renderRulesTable(); pushRemoteDebounced(); }
     });
   });
 }
 
 /* Buttons */
 document.getElementById("btn-add-rule").addEventListener("click",()=>{ rules.push({reason:"New reason", points:1, type:"positive"}); renderRulesTable(); pushRemoteDebounced(); });
-document.getElementById("btn-save-rules").addEventListener("click",async()=>{ await remotePostState(nowState()); alert("Rules saved to server."); });
-
+document.getElementById("btn-save-rules").addEventListener("click", async ()=>{ await remotePostState(nowState()); alert("Rules saved to server."); });
 document.getElementById("btn-publish").addEventListener("click", async ()=>{
-  const res = await remotePostState(nowState());
-  if(res && res.ok) alert("Published to server.");
-  else alert("Publish failed. Check WRITE_SECRET or CORS.");
+  const res=await remotePostState(nowState()); if(res && res.ok) alert("Published to server."); else alert("Publish failed. Check WRITE_SECRET or CORS.");
 });
-
 document.getElementById("btn-add-player").addEventListener("click",()=>{
-  const name = (document.getElementById("new-player-name").value||"").trim();
+  const name=(document.getElementById("new-player-name").value||"").trim();
   if(!name) return alert("Enter a player name");
   if(salespeople.length>=MAX_PLAYERS) return alert("Max players reached");
   if(salespeople.some(p=>p.name.toLowerCase()===name.toLowerCase())) return alert("Name already exists");
@@ -446,30 +375,26 @@ document.getElementById("btn-add-player").addEventListener("click",()=>{
   refreshDropdowns(); renderLanes(); renderLeaderboard(); pushRemoteDebounced();
 });
 document.getElementById("btn-remove-player").addEventListener("click",()=>{
-  const idx = parseInt(document.getElementById("remove-player-select").value,10);
+  const idx=parseInt(document.getElementById("remove-player-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
   if(salespeople.length<=1) return alert("Cannot remove last player");
-  const name = salespeople[idx].name;
-  if(confirm(`Remove ${name}?`)){
-    salespeople.splice(idx,1);
-    refreshDropdowns(); renderLanes(); renderLeaderboard(); pushRemoteDebounced();
-  }
+  const name=salespeople[idx].name;
+  if(confirm(`Remove ${name}?`)){ salespeople.splice(idx,1); refreshDropdowns(); renderLanes(); renderLeaderboard(); pushRemoteDebounced(); }
 });
-
 document.getElementById("btn-set").addEventListener("click",()=>{
-  const idx = parseInt(document.getElementById("salesperson-select").value,10);
+  const idx=parseInt(document.getElementById("salesperson-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
-  const val = parseInt(document.getElementById("points-input").value,10);
+  const val=parseInt(document.getElementById("points-input").value,10);
   if(Number.isNaN(val)) return alert("Enter a number");
   setPoints(idx, val, "Manual set");
 });
 document.getElementById("btn-add5").addEventListener("click",()=>{
-  const idx = parseInt(document.getElementById("salesperson-select").value,10);
+  const idx=parseInt(document.getElementById("salesperson-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
   changePoints(idx, +5, "Quick +5");
 });
 document.getElementById("btn-sub5").addEventListener("click",()=>{
-  const idx = parseInt(document.getElementById("salesperson-select").value,10);
+  const idx=parseInt(document.getElementById("salesperson-select").value,10);
   if(Number.isNaN(idx)) return alert("Select a player");
   changePoints(idx, -5, "Quick -5");
 });
@@ -484,25 +409,17 @@ document.getElementById("btn-randomize").addEventListener("click",()=>{
   renderLeaderboard(); pushRemoteDebounced();
 });
 
-/* Init: pull from server; if empty, bootstrap defaults to server */
+/* Init: pull from server; if empty, bootstrap defaults */
 async function init(){
   try{
     const remote = await remoteGetState();
-    let changed = false;
+    let seed=false;
     if(remote && Array.isArray(remote.salespeople) && remote.salespeople.length){
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
-    } else {
-      changed = true; // bootstrap players
-    }
-    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length){
-      rules = remote.scoringRules;
-    } else { changed = true; }
-    if(remote && Array.isArray(remote.rewards) && remote.rewards.length){
-      rewards = remote.rewards;
-    } else { changed = true; }
-    if(changed){
-      await remotePostState(nowState()); // seed the server so public never blanks
-    }
+    } else seed=true;
+    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length) rules = remote.scoringRules; else seed=true;
+    if(remote && Array.isArray(remote.rewards) && remote.rewards.length) rewards = remote.rewards; else seed=true;
+    if(seed){ await remotePostState(nowState()); }
   }catch(e){ console.warn("Remote load failed, using defaults.", e); }
   renderLanes(); renderLeaderboard(); refreshDropdowns(); renderRulesTable();
 }
