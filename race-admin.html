@@ -199,7 +199,6 @@ let rewards = DEFAULT_REWARDS.map(r=>({...r}));
 /* Remote helpers: simple requests (no preflight), pure JSON responses */
 async function remoteGetState() {
   const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET' });
-  // If Apps Script ever returns HTML by accident, fail gracefully:
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 }; }
 }
@@ -225,11 +224,15 @@ const pushRemoteDebounced = debounce(async function(){ try{ await remotePostStat
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-function renderRewardMarkers(){ /* unchanged */ 
-  const cont = $("#reward-markers"); cont.innerHTML=""; const track = $(".track-container"); const w = track.offsetWidth - 100;
-  (rewards||[]).forEach(r=>{ const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
+function renderRewardMarkers(){ 
+  const cont = $("#reward-markers"); cont.innerHTML="";
+  const track = $(".track-container"); const w = track.offsetWidth - 100;
+  (rewards||[]).forEach(r=>{
+    const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px"; cont.appendChild(el); });
+    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px";
+    cont.appendChild(el);
+  });
 }
 function renderLanes(){
   const lanes = $("#race-lanes"); lanes.innerHTML="";
@@ -240,7 +243,8 @@ function renderLanes(){
       <div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div></div>`;
     lanes.appendChild(lane);
   });
-  attachHorseClicks(); salespeople.forEach((_,i)=>{updateHorse(i); updateInfo(i);});
+  attachHorseClicks();
+  salespeople.forEach((_,i)=>{updateHorse(i); updateInfo(i);});
   setTimeout(renderRewardMarkers,100);
 }
 function attachHorseClicks(){ $$(".horse").forEach((n,i)=>n.addEventListener("click",()=>changePoints(i,+5,"Horse +5"))); }
@@ -259,43 +263,63 @@ function updateInfo(i){
   else if(p.points>=20) badge.style.background="#e67e22"; else badge.style.background="#3498db";
 }
 function renderLeaderboard(){
-  const lb=$("#leaderboard-content"); lb.innerHTML=""; const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
+  const lb=$("#leaderboard-content"); lb.innerHTML="";
+  const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
   sorted.forEach((p,idx)=>{
     const d=document.createElement("div"); d.className="leaderboard-item";
-    if(idx===0 && p.points>0) d.classList.add("first"); else if(idx===1 && p.points>0) d.classList.add("second"); else if(idx===2 && p.points>0) d.classList.add("third");
+    if(idx===0 && p.points>0) d.classList.add("first");
+    else if(idx===1 && p.points>0) d.classList.add("second");
+    else if(idx===2 && p.points>0) d.classList.add("third");
     const medal=idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
     d.innerHTML = `<div><span class="position">${medal}</span><span>${p.name}</span>${p.laps>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}</div><div><span class="points">${p.points} pts</span></div>`;
     lb.appendChild(d);
   });
 }
 function refreshDropdowns(){
-  const sel=$("#salesperson-select"), rem=$("#remove-player-select"); sel.innerHTML=""; rem.innerHTML='<option value="">Select player</option>';
-  salespeople.forEach((p,i)=>{ const a=document.createElement("option"); a.value=i; a.textContent=p.name; sel.appendChild(a);
-    const b=document.createElement("option"); b.value=i; b.textContent=p.name; rem.appendChild(b); });
+  const sel=$("#salesperson-select"), rem=$("#remove-player-select");
+  sel.innerHTML=""; rem.innerHTML='<option value="">Select player</option>';
+  salespeople.forEach((p,i)=>{
+    const a=document.createElement("option"); a.value=i; a.textContent=p.name; sel.appendChild(a);
+    const b=document.createElement("option"); b.value=i; b.textContent=p.name; rem.appendChild(b);
+  });
 }
 function toast(name, delta, reason){
-  const n=document.createElement("div"), pos=delta>0; n.className=`reason-notification ${pos?'positive':'penalty'}`;
-  n.innerHTML=`${pos?'🎉':'⚠️'} <strong>${name}</strong><br>${delta>0?`+${delta}`:delta} points: ${reason}`; document.body.appendChild(n);
-  setTimeout(()=>n.remove(),3200);
+  const n=document.createElement("div"), pos=delta>0;
+  n.className=`reason-notification ${pos?'positive':'penalty'}`;
+  n.innerHTML=`${pos?'🎉':'⚠️'} <strong>${name}</strong><br>${delta>0?`+${delta}`:delta} points: ${reason}`;
+  document.body.appendChild(n); setTimeout(()=>n.remove(),3200);
 }
 
+/* --- Landing-only rewards here --- */
 function setPoints(i, val, reason="Set"){
-  const p=salespeople[i], old=p.points; p.points=Math.max(0,Math.min(MAX_POINTS,val|0)); p.laps=Math.floor(p.points/TRACK_LENGTH);
-  checkRewards(i, old, p.points); updateHorse(i); updateInfo(i); renderLeaderboard(); pushRemoteDebounced(); toast(p.name, p.points-old, reason);
+  const p=salespeople[i], old=p.points;
+  p.points=Math.max(0,Math.min(MAX_POINTS,val|0));
+  p.laps=Math.floor(p.points/TRACK_LENGTH);
+  checkRewards(i, old, p.points);
+  updateHorse(i); updateInfo(i); renderLeaderboard();
+  pushRemoteDebounced(); toast(p.name, p.points-old, reason);
 }
 function changePoints(i, delta, reason="Adjust"){ setPoints(i,(salespeople[i].points||0)+delta,reason); }
 function checkRewards(i, oldPts, newPts){
-  const player=salespeople[i]; const oldLap=~~(oldPts/TRACK_LENGTH), newLap=~~(newPts/TRACK_LENGTH);
-  const oldPos=oldPts%TRACK_LENGTH, newPos=newPts%TRACK_LENGTH;
+  const player=salespeople[i];
+  const oldLap = Math.floor(oldPts/TRACK_LENGTH);
+  const newLap = Math.floor(newPts/TRACK_LENGTH);
+  const newPos = newPts % TRACK_LENGTH;
+
   if(newLap>oldLap) toast(player.name,0,`Completed Lap ${newLap}`);
+
   // Trigger only when landing exactly on the marker (not when passing)
-  (rewards||[]).forEach(r=>{ 
-    if (newPos === r.points) { 
-      toast(player.name,0,`Reward: ${r.emoji} ${r.name}`); 
-      if(r.type==="move-forward"){ setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); } 
-    } 
+  (rewards||[]).forEach(r=>{
+    if (newPos === r.points) {
+      toast(player.name,0,`Reward: ${r.emoji} ${r.name}`);
+      if(r.type==="move-forward"){
+        setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800);
+      }
+    }
   });
 }
+/* --- end landing-only change --- */
+
 function renderRulesTable(){
   const tbody=document.querySelector("#rules-table tbody"); tbody.innerHTML="";
   rules.forEach((rule,i)=>{
