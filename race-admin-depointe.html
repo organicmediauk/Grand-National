@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>De Pointe Research — Race Track (Admin)</title>
+<title>Sales Team Race Track — Admin</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);min-height:100vh;padding:20px}
@@ -15,8 +15,10 @@
   .track-container::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(255,255,255,.1) 48px,rgba(255,255,255,.1) 52px);pointer-events:none}
   .finish-line{position:absolute;right:20px;top:0;bottom:0;width:8px;background:repeating-linear-gradient(0deg,#000 0px,#000 10px,#fff 10px,#fff 20px);border-radius:4px}
   .finish-flag{position:absolute;right:10px;top:10px;font-size:2rem}
-  .reward-marker{position:absolute;top:10px;background:rgba(255,255,255,.9);border:2px solid #f39c12;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:bold;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+  .reward-marker{position:absolute;top:10px;background:rgba(255,255,255,.9);border:2px solid #3498db;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:bold;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
   .reward-marker.move-forward{border-color:#3498db;background:linear-gradient(45deg,#fff,#e6f3ff)}
+  /* Hide any non–move-forward markers in case old data slips through */
+  .reward-marker:not(.move-forward){display:none!important}
   .lane{display:flex;align-items:center;margin-bottom:18px;background:rgba(255,255,255,.12);border-radius:10px;padding:15px;position:relative;min-height:80px}
   .lane:last-child{margin-bottom:0}
   .horse{font-size:2.5rem;transition:all .5s ease;position:absolute;left:15px;z-index:10;cursor:pointer}
@@ -58,8 +60,8 @@
 <body>
 <div class="container">
   <div class="header">
-    <h1>🏇 De Pointe Research — Race Track (Admin)</h1>
-    <p>Edit players, scoring, and positions. Changes sync to the De Pointe public board.</p>
+    <h1>🏇 Sales Team Race Track — Admin</h1>
+    <p>Edit players, scoring, and positions. Changes sync to the public board.</p>
   </div>
 
   <div class="track-container">
@@ -145,7 +147,6 @@
 /* ======= REMOTE SYNC CONFIG ======= */
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
 const SECRET  = 'uAnG8Q2vN6!Zr3pX0hJf5wL4cS9tEeB';   // must match Code.gs SECRET
-const BUCKET  = 'depointe-research';              // ← unique namespace
 const REMOTE_TIMEOUT = 8000;
 /* ================================== */
 
@@ -181,9 +182,11 @@ const DEFAULT_RULES = [
   { reason:"Absent without leave - Puncture", points:-5, type:"penalty" },
   { reason:"Dress code - Stewards Penalty", points:-5, type:"penalty" }
 ];
+
+/* ONLY move-forward rewards kept */
 const DEFAULT_REWARDS = [
   { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' }
 ];
 
 let salespeople = DEFAULT_PLAYERS.map(p=>({...p}));
@@ -192,14 +195,14 @@ let rewards = DEFAULT_REWARDS.map(r=>({...r}));
 
 /* Remote helpers */
 async function remoteGetState() {
-  const res = await fetch(`${ENDPOINT}?bucket=${encodeURIComponent(BUCKET)}&t=${Date.now()}`, { method: 'GET' });
+  const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET' });
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 }; }
 }
 async function remotePostState(state) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), REMOTE_TIMEOUT);
-  const body = JSON.stringify({ ...state, secret: SECRET, bucket: BUCKET });
+  const body = JSON.stringify({ ...state, secret: SECRET });
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
@@ -217,11 +220,16 @@ const pushRemoteDebounced = debounce(async function(){ try{ await remotePostStat
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-function renderRewardMarkers(){ 
-  const cont = $("#reward-markers"); cont.innerHTML=""; const track = $(".track-container"); const w = track.offsetWidth - 100;
-  (rewards||[]).forEach(r=>{ const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
+function renderRewardMarkers(){
+  const cont = $("#reward-markers"); cont.innerHTML="";
+  const track = $(".track-container"); const w = track.offsetWidth - 100;
+  (rewards||[]).forEach(r=>{
+    if(r.type!=='move-forward') return; // safety
+    const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px"; cont.appendChild(el); });
+    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px";
+    cont.appendChild(el);
+  });
 }
 function renderLanes(){
   const lanes = $("#race-lanes"); lanes.innerHTML="";
@@ -232,7 +240,8 @@ function renderLanes(){
       <div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div></div>`;
     lanes.appendChild(lane);
   });
-  attachHorseClicks(); salespeople.forEach((_,i)=>{updateHorse(i); updateInfo(i);});
+  attachHorseClicks();
+  salespeople.forEach((_,i)=>{updateHorse(i); updateInfo(i);});
   setTimeout(renderRewardMarkers,100);
 }
 function attachHorseClicks(){ $$(".horse").forEach((n,i)=>n.addEventListener("click",()=>changePoints(i,+5,"Horse +5"))); }
@@ -251,7 +260,8 @@ function updateInfo(i){
   else if(p.points>=20) badge.style.background="#e67e22"; else badge.style.background="#3498db";
 }
 function renderLeaderboard(){
-  const lb=$("#leaderboard-content"); lb.innerHTML=""; const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
+  const lb=$("#leaderboard-content"); lb.innerHTML="";
+  const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
   sorted.forEach((p,idx)=>{
     const d=document.createElement("div"); d.className="leaderboard-item";
     if(idx===0 && p.points>0) d.classList.add("first"); else if(idx===1 && p.points>0) d.classList.add("second"); else if(idx===2 && p.points>0) d.classList.add("third");
@@ -271,19 +281,29 @@ function toast(name, delta, reason){
   setTimeout(()=>n.remove(),3200);
 }
 
-/* Landing-only rewards */
+/* Landing-only move-forward rewards */
 function setPoints(i, val, reason="Set"){
   const p=salespeople[i], old=p.points; p.points=Math.max(0,Math.min(MAX_POINTS,val|0)); p.laps=Math.floor(p.points/TRACK_LENGTH);
   checkRewards(i, old, p.points); updateHorse(i); updateInfo(i); renderLeaderboard(); pushRemoteDebounced(); toast(p.name, p.points-old, reason);
 }
 function changePoints(i, delta, reason="Adjust"){ setPoints(i,(salespeople[i].points||0)+delta,reason); }
 function checkRewards(i, oldPts, newPts){
-  const player=salespeople[i]; const oldLap=Math.floor(oldPts/TRACK_LENGTH), newLap=Math.floor(newPts/TRACK_LENGTH);
-  const newPos=newPts%TRACK_LENGTH; if(newLap>oldLap) toast(player.name,0,`Completed Lap ${newLap}`);
-  (rewards||[]).forEach(r=>{ if(newPos===r.points){ toast(player.name,0,`Reward: ${r.emoji} ${r.name}`); if(r.type==="move-forward"){ setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); } }});
-}
-/* End landing-only */
+  const player=salespeople[i];
+  const oldLap = Math.floor(oldPts/TRACK_LENGTH);
+  const newLap = Math.floor(newPts/TRACK_LENGTH);
+  const newPos = newPts % TRACK_LENGTH;
+  if(newLap>oldLap) toast(player.name,0,`Completed Lap ${newLap}`);
 
+  (rewards||[]).forEach(r=>{
+    if (r.type !== 'move-forward') return; // safety
+    if (newPos === r.points) {
+      toast(player.name,0,`Reward: ${r.emoji} ${r.name}`);
+      setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800);
+    }
+  });
+}
+
+/* Rules table */
 function renderRulesTable(){
   const tbody=document.querySelector("#rules-table tbody"); tbody.innerHTML="";
   rules.forEach((rule,i)=>{
@@ -322,7 +342,7 @@ function renderRulesTable(){
 document.getElementById("btn-add-rule").addEventListener("click",()=>{ rules.push({reason:"New reason", points:1, type:"positive"}); renderRulesTable(); pushRemoteDebounced(); });
 document.getElementById("btn-save-rules").addEventListener("click", async ()=>{ await remotePostState(nowState()); alert("Rules saved to server."); });
 document.getElementById("btn-publish").addEventListener("click", async ()=>{
-  const res=await remotePostState(nowState()); if(res && res.ok) alert("Published to server."); else alert("Publish failed. Check SECRET/Deployment.");
+  const res=await remotePostState(nowState()); if(res && res.ok) alert("Published to server."); else alert("Publish failed. Check SECRET and deployment.");
 });
 document.getElementById("btn-add-player").addEventListener("click",()=>{
   const name=(document.getElementById("new-player-name").value||"").trim();
@@ -368,17 +388,33 @@ document.getElementById("btn-randomize").addEventListener("click",()=>{
   renderLeaderboard(); pushRemoteDebounced();
 });
 
-/* Init */
+/* Init: load remote; filter to move-forward only; if remote missing, seed; then push filtered version */
 async function init(){
   try{
     const remote = await remoteGetState();
     let seed=false;
+
     if(remote && Array.isArray(remote.salespeople) && remote.salespeople.length){
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
     } else seed = true;
-    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length) rules = remote.scoringRules; else seed = true;
-    if(remote && Array.isArray(remote.rewards) && remote.rewards.length) rewards = remote.rewards; else seed = true;
-    if(seed){ await remotePostState(nowState()); }
+
+    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length){
+      rules = remote.scoringRules;
+    } else seed = true;
+
+    if(remote && Array.isArray(remote.rewards)){
+      rewards = remote.rewards.filter(r=>r.type==='move-forward');
+      if(rewards.length === 0){
+        rewards = DEFAULT_REWARDS.map(r=>({...r}));
+      }
+    } else {
+      rewards = DEFAULT_REWARDS.map(r=>({...r}));
+      seed = true;
+    }
+
+    // Push filtered state back to server so public also loses old markers
+    await remotePostState(nowState());
+
   }catch(e){ console.warn("Remote load failed, using defaults.", e); }
   renderLanes(); renderLeaderboard(); refreshDropdowns(); renderRulesTable();
 }
