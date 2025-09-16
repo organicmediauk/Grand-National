@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>De Pointe Grand National</title>
+<title>Sales Team Race Track — Public</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);min-height:100vh;padding:20px}
@@ -15,10 +15,10 @@
   .track-container::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(255,255,255,.1) 48px,rgba(255,255,255,.1) 52px);pointer-events:none}
   .finish-line{position:absolute;right:20px;top:0;bottom:0;width:8px;background:repeating-linear-gradient(0deg,#000 0px,#000 10px,#fff 10px,#fff 20px);border-radius:4px}
   .finish-flag{position:absolute;right:10px;top:10px;font-size:2rem}
-  .reward-marker{position:absolute;top:10px;background:rgba(255,255,255,.9);border:2px solid #f39c12;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:bold;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
-  .reward-marker.scratch-card{border-color:#e74c3c;background:linear-gradient(45deg,#fff,#ffe6e6)}
+  .reward-marker{position:absolute;top:10px;background:rgba(255,255,255,.9);border:2px solid #3498db;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:bold;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
   .reward-marker.move-forward{border-color:#3498db;background:linear-gradient(45deg,#fff,#e6f3ff)}
-  .reward-marker.extra-lead{border-color:#9b59b6;background:linear-gradient(45deg,#fff,#f3e6ff)}
+  /* Hide any non–move-forward markers if they sneak in from server */
+  .reward-marker:not(.move-forward){display:none!important}
   .lane{display:flex;align-items:center;margin-bottom:18px;background:rgba(255,255,255,.12);border-radius:10px;padding:15px;position:relative;min-height:80px}
   .lane:last-child{margin-bottom:0}
   .horse{font-size:2.5rem;position:absolute;left:15px;z-index:10;user-select:none;cursor:default;transition:none}
@@ -39,7 +39,8 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>🏆 De Pointe Grand National</h1>
+      <h1>🏆 Sales Team Race Track</h1>
+      <p style="color:#7f8c8d">Live standings (only move-forward bonuses shown).</p>
     </div>
 
     <div class="track-container">
@@ -57,20 +58,18 @@
 
 <script>
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
-const BUCKET  = 'depointe-research';   // ← must match admin
 const REFRESH_MS = 8000;
 const TRACK_LENGTH = 30;
 
 let salespeople = [];
 let rewards = [
   { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' }
 ];
-
 let initialized = false;
 
 async function remoteGetState() {
-  const res = await fetch(`${ENDPOINT}?bucket=${encodeURIComponent(BUCKET)}&t=${Date.now()}`, { method:'GET' });
+  const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method:'GET' });
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { salespeople: [], rewards: [] }; }
 }
@@ -79,6 +78,7 @@ function generateRewardMarkers() {
   const markers = document.getElementById("reward-markers"); markers.innerHTML = "";
   const track = document.querySelector(".track-container"); const trackWidth = track.offsetWidth - 100;
   (rewards||[]).forEach(r=>{
+    if(r.type!=='move-forward') return; // safety
     const el = document.createElement("div");
     el.className = `reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
@@ -157,7 +157,13 @@ async function refreshFromRemote(){
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
       if (needRebuild) { initialized = false; buildLanesOnce(); }
     }
-    if(remote && Array.isArray(remote.rewards) && remote.rewards.length){ rewards = remote.rewards; }
+    if(remote && Array.isArray(remote.rewards)){
+      // Only keep move-forward markers even if server has others
+      const filtered = remote.rewards.filter(r=>r.type==='move-forward');
+      rewards = filtered.length? filtered : rewards;
+      // re-render markers in case they changed on server
+      setTimeout(generateRewardMarkers, 50);
+    }
   }catch(e){ console.warn("Public refresh failed", e); }
   updateViewOnly();
 }
