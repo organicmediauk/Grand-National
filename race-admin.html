@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>EXB Grand National — Admin (Original)</title>
+<title>Sales Team Race Track — Admin</title>
 <style>
+  /* (styles unchanged from your working version) */
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);min-height:100vh;padding:20px}
   .container{max-width:1200px;margin:0 auto;background:#fff;border-radius:20px;padding:30px;box-shadow:0 20px 40px rgba(0,0,0,.1)}
@@ -15,7 +16,7 @@
   .track-container::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(255,255,255,.1) 48px,rgba(255,255,255,.1) 52px);pointer-events:none}
   .finish-line{position:absolute;right:20px;top:0;bottom:0;width:8px;background:repeating-linear-gradient(0deg,#000 0px,#000 10px,#fff 10px,#fff 20px);border-radius:4px}
   .finish-flag{position:absolute;right:10px;top:10px;font-size:2rem}
-  .reward-marker{position:absolute;top:10px;background:rgba(255,255,255,.92);border:2px solid #f39c12;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:bold;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+  .reward-marker{position:absolute;top:10px;background:rgba(255,255,255,.9);border:2px solid #f39c12;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:bold;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
   .reward-marker.scratch-card{border-color:#e74c3c;background:linear-gradient(45deg,#fff,#ffe6e6)}
   .reward-marker.move-forward{border-color:#3498db;background:linear-gradient(45deg,#fff,#e6f3ff)}
   .reward-marker.extra-lead{border-color:#9b59b6;background:linear-gradient(45deg,#fff,#f3e6ff)}
@@ -42,7 +43,7 @@
   .leaderboard-item{display:flex;justify-content:space-between;align-items:center;padding:10px;margin-bottom:8px;background:#fff;border-radius:8px;border-left:4px solid #3498db}
   .leaderboard-item.first{border-left-color:#f1c40f;background:linear-gradient(90deg,#fff9e6,#fff)}
   .leaderboard-item.second{border-left-color:#95a5a6;background:linear-gradient(90deg,#f8f9fa,#fff)}
-  .leaderboard-item.third{border-left-color:#e67e22;background:linear-gradient(90deg,#fdf2f9,#fff)}
+  .leaderboard-item.third{border-left-color:#e67e22;background:linear-gradient(90deg,#fdf2e9,#fff)}
   .position{font-weight:bold;color:#2c3e50;min-width:30px}
   .reason-notification{position:fixed;top:20px;right:20px;background:#fff;border:2px solid #3498db;border-radius:10px;padding:15px 20px;font-size:1rem;color:#2c3e50;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:slideIn .3s ease-out;max-width:320px}
   .reason-notification.penalty{border-color:#e74c3c;background:linear-gradient(45deg,#fff,#ffeaea)}
@@ -60,8 +61,8 @@
 <body>
 <div class="container">
   <div class="header">
-    <h1>🏇 EXB Grand National — Admin (Original)</h1>
-    <p>Full prize set. Changes sync only to the “original” board.</p>
+    <h1>🏇 Sales Team Race Track — Admin</h1>
+    <p>Edit players, scoring, and positions. Changes sync to the public board.</p>
   </div>
 
   <div class="track-container">
@@ -144,10 +145,9 @@
 </div>
 
 <script>
-/* ======= REMOTE SYNC CONFIG (original bucket) ======= */
+/* ======= REMOTE SYNC CONFIG ======= */
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
-const SECRET  = 'uAnG8Q2vN6!Zr3pX0hJf5wL4cS9tEeB';
-const BUCKET  = 'original';
+const SECRET  = 'uAnG8Q2vN6!Zr3pX0hJf5wL4cS9tEeB';   // must match Code.gs SECRET
 const REMOTE_TIMEOUT = 8000;
 /* ================================== */
 
@@ -155,16 +155,6 @@ const TRACK_LENGTH = 30;
 const MAX_POINTS = 300;
 const MAX_PLAYERS = 15;
 const HORSES = ["🐎","🐴","🏇","🦄","🎠"];
-
-/* Full original rewards */
-const DEFAULT_REWARDS = [
-  { points:3,  type:'scratch-card', name:'Scratch Card',    emoji:'🎟️' },
-  { points:12, type:'move-forward', name:'Move Forward 2',  emoji:'⏩'  },
-  { points:17, type:'scratch-card', name:'Scratch Card',    emoji:'🎟️' },
-  { points:23, type:'extra-lead',   name:'Extra Lead',      emoji:'📞'  },
-  { points:27, type:'move-forward', name:'Move Forward 2',  emoji:'⏩'  },
-  { points:30, type:'scratch-card', name:'Scratch Card',    emoji:'🎟️' }
-];
 
 const DEFAULT_PLAYERS = [
   { name:"Alex Johnson", points:0, horse:"🐎", laps:0 },
@@ -193,21 +183,31 @@ const DEFAULT_RULES = [
   { reason:"Absent without leave - Puncture", points:-5, type:"penalty" },
   { reason:"Dress code - Stewards Penalty", points:-5, type:"penalty" }
 ];
+const DEFAULT_REWARDS = [
+  { points:3, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:17, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:23, type:'extra-lead',   name:'Extra Lead',     emoji:'📞' },
+  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
+  { points:30, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' }
+];
 
 let salespeople = DEFAULT_PLAYERS.map(p=>({...p}));
 let rules = DEFAULT_RULES.map(r=>({...r}));
 let rewards = DEFAULT_REWARDS.map(r=>({...r}));
 
-/* Remote helpers */
+/* Remote helpers: simple requests (no preflight), pure JSON responses */
 async function remoteGetState() {
-  const res = await fetch(`${ENDPOINT}?bucket=${encodeURIComponent(BUCKET)}&t=${Date.now()}`, { method: 'GET' });
+  const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET' });
+  // If Apps Script ever returns HTML by accident, fail gracefully:
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 }; }
 }
 async function remotePostState(state) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), REMOTE_TIMEOUT);
-  const body = JSON.stringify({ ...state, secret: SECRET, bucket: BUCKET });
+  // NOTE: text/plain + no custom headers => no CORS preflight
+  const body = JSON.stringify({ ...state, secret: SECRET });
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
@@ -221,19 +221,15 @@ function nowState(){ return { salespeople, scoringRules: rules, rewards }; }
 function debounce(fn, ms=600){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 const pushRemoteDebounced = debounce(async function(){ try{ await remotePostState(nowState()); }catch(e){} }, 700);
 
-/* DOM helpers */
+/* DOM helpers (renderers/controls) — same as your current version */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-function renderRewardMarkers(){
-  const cont = $("#reward-markers"); cont.innerHTML="";
-  const track = $(".track-container"); const w = track.offsetWidth - 100;
-  (rewards||[]).forEach(r=>{
-    const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
+function renderRewardMarkers(){ /* unchanged */ 
+  const cont = $("#reward-markers"); cont.innerHTML=""; const track = $(".track-container"); const w = track.offsetWidth - 100;
+  (rewards||[]).forEach(r=>{ const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px";
-    cont.appendChild(el);
-  });
+    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px"; cont.appendChild(el); });
 }
 function renderLanes(){
   const lanes = $("#race-lanes"); lanes.innerHTML="";
@@ -244,8 +240,7 @@ function renderLanes(){
       <div><span class="points">${p.points} pts</span>${p.laps>0?`<span class="laps">Lap ${p.laps}</span>`:""}</div></div>`;
     lanes.appendChild(lane);
   });
-  attachHorseClicks();
-  salespeople.forEach((_,i)=>{updateHorse(i); updateInfo(i);});
+  attachHorseClicks(); salespeople.forEach((_,i)=>{updateHorse(i); updateInfo(i);});
   setTimeout(renderRewardMarkers,100);
 }
 function attachHorseClicks(){ $$(".horse").forEach((n,i)=>n.addEventListener("click",()=>changePoints(i,+5,"Horse +5"))); }
@@ -264,8 +259,7 @@ function updateInfo(i){
   else if(p.points>=20) badge.style.background="#e67e22"; else badge.style.background="#3498db";
 }
 function renderLeaderboard(){
-  const lb=$("#leaderboard-content"); lb.innerHTML="";
-  const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
+  const lb=$("#leaderboard-content"); lb.innerHTML=""; const sorted=[...salespeople].sort((a,b)=> b.laps - a.laps || b.points - a.points);
   sorted.forEach((p,idx)=>{
     const d=document.createElement("div"); d.className="leaderboard-item";
     if(idx===0 && p.points>0) d.classList.add("first"); else if(idx===1 && p.points>0) d.classList.add("second"); else if(idx===2 && p.points>0) d.classList.add("third");
@@ -285,35 +279,23 @@ function toast(name, delta, reason){
   setTimeout(()=>n.remove(),3200);
 }
 
-/* Points + rewards (pass OR land) */
 function setPoints(i, val, reason="Set"){
   const p=salespeople[i], old=p.points; p.points=Math.max(0,Math.min(MAX_POINTS,val|0)); p.laps=Math.floor(p.points/TRACK_LENGTH);
   checkRewards(i, old, p.points); updateHorse(i); updateInfo(i); renderLeaderboard(); pushRemoteDebounced(); toast(p.name, p.points-old, reason);
 }
 function changePoints(i, delta, reason="Adjust"){ setPoints(i,(salespeople[i].points||0)+delta,reason); }
-
 function checkRewards(i, oldPts, newPts){
-  const player=salespeople[i];
-  const oldLap=~~(oldPts/TRACK_LENGTH), newLap=~~(newPts/TRACK_LENGTH);
+  const player=salespeople[i]; const oldLap=~~(oldPts/TRACK_LENGTH), newLap=~~(newPts/TRACK_LENGTH);
   const oldPos=oldPts%TRACK_LENGTH, newPos=newPts%TRACK_LENGTH;
-
-  if(newLap>oldLap){ toast(player.name,0,`Completed Lap ${newLap}`); }
-
-  // Rewards fire if the player passes OR lands on a marker within the lap
-  (rewards||[]).forEach(r=>{
-    const crossed = (oldPos < r.points && newPos >= r.points && newLap === oldLap)  // within same lap
-                 || (newLap > oldLap && (oldPos < r.points || newPos >= r.points)); // crossed lap line
-    if(crossed){
-      toast(player.name,0,`Reward: ${r.emoji} ${r.name}`);
-      if(r.type === 'move-forward'){
-        setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800);
-      }
-      // (Scratch/extra-lead are just notifications in this original; customize if needed)
-    }
+  if(newLap>oldLap) toast(player.name,0,`Completed Lap ${newLap}`);
+  // Trigger only when landing exactly on the marker (not when passing)
+  (rewards||[]).forEach(r=>{ 
+    if (newPos === r.points) { 
+      toast(player.name,0,`Reward: ${r.emoji} ${r.name}`); 
+      if(r.type==="move-forward"){ setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); } 
+    } 
   });
 }
-
-/* Rules table */
 function renderRulesTable(){
   const tbody=document.querySelector("#rules-table tbody"); tbody.innerHTML="";
   rules.forEach((rule,i)=>{
@@ -352,7 +334,7 @@ function renderRulesTable(){
 document.getElementById("btn-add-rule").addEventListener("click",()=>{ rules.push({reason:"New reason", points:1, type:"positive"}); renderRulesTable(); pushRemoteDebounced(); });
 document.getElementById("btn-save-rules").addEventListener("click", async ()=>{ await remotePostState(nowState()); alert("Rules saved to server."); });
 document.getElementById("btn-publish").addEventListener("click", async ()=>{
-  const res=await remotePostState(nowState()); if(res && res.ok) alert("Published to server."); else alert("Publish failed. Check SECRET/URL.");
+  const res=await remotePostState(nowState()); if(res && res.ok) alert("Published to server."); else alert("Publish failed. Check SECRET and deployment.");
 });
 document.getElementById("btn-add-player").addEventListener("click",()=>{
   const name=(document.getElementById("new-player-name").value||"").trim();
@@ -398,26 +380,17 @@ document.getElementById("btn-randomize").addEventListener("click",()=>{
   renderLeaderboard(); pushRemoteDebounced();
 });
 
-/* Init: load remote; seed ONLY if empty (do NOT auto-overwrite) */
+/* Init: load remote; if empty, seed remote so public isn't blank */
 async function init(){
   try{
     const remote = await remoteGetState();
     let seed=false;
-
     if(remote && Array.isArray(remote.salespeople) && remote.salespeople.length){
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
-    } else { seed = true; }
-
-    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length){
-      rules = remote.scoringRules;
-    } else { seed = true; }
-
-    if(remote && Array.isArray(remote.rewards) && remote.rewards.length){
-      rewards = remote.rewards;
-    } else { rewards = DEFAULT_REWARDS.map(r=>({...r})); seed = true; }
-
-    if(seed){ await remotePostState(nowState()); } // only seed when empty
-
+    } else seed = true;
+    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length) rules = remote.scoringRules; else seed = true;
+    if(remote && Array.isArray(remote.rewards) && remote.rewards.length) rewards = remote.rewards; else seed = true;
+    if(seed){ await remotePostState(nowState()); }
   }catch(e){ console.warn("Remote load failed, using defaults.", e); }
   renderLanes(); renderLeaderboard(); refreshDropdowns(); renderRulesTable();
 }
