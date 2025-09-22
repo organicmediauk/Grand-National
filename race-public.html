@@ -21,7 +21,7 @@
   .reward-marker.extra-lead{border-color:#9b59b6;background:linear-gradient(45deg,#fff,#f3e6ff)}
   .lane{display:flex;align-items:center;margin-bottom:18px;background:rgba(255,255,255,.12);border-radius:10px;padding:15px;position:relative;min-height:80px}
   .lane:last-child{margin-bottom:0}
-  .horse{font-size:2.5rem;position:absolute;left:15px;z-index:10;user-select:none;cursor:default;transition:none} /* no animation on public */
+  .horse{font-size:2.5rem;transition:all .5s ease;position:absolute;left:15px;z-index:10;user-select:none;cursor:default}
   .salesperson-info{background:rgba(255,255,255,.92);border-radius:8px;padding:10px 15px;margin-left:80px;flex:1;display:flex;justify-content:space-between;align-items:center}
   .salesperson-name{font-weight:bold;color:#2c3e50;font-size:1.05rem}
   .points{background:#3498db;color:#fff;padding:5px 12px;border-radius:20px;font-weight:bold;margin-right:8px}
@@ -33,6 +33,7 @@
   .leaderboard-item.second{border-left-color:#95a5a6;background:linear-gradient(90deg,#f8f9fa,#fff)}
   .leaderboard-item.third{border-left-color:#e67e22;background:linear-gradient(90deg,#fdf2e9,#fff)}
   .position{font-weight:bold;color:#2c3e50;min-width:30px}
+  @keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
   @media(max-width:768px){.container{padding:20px}.horse{font-size:2rem}.salesperson-info{margin-left:60px}}
 </style>
 </head>
@@ -58,7 +59,6 @@
 <script>
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
 const REFRESH_MS = 8000;
-const BUCKET = 'original';
 const TRACK_LENGTH = 30;
 
 let salespeople = [];
@@ -70,8 +70,6 @@ let rewards = [
   { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
   { points:30, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' }
 ];
-
-let initialized = false;
 
 async function remoteGetState() {
   const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method:'GET' });
@@ -91,45 +89,30 @@ function generateRewardMarkers() {
   });
 }
 
-function buildLanesOnce() {
-  if (initialized) return;
+function generateLanes() {
   const lanes = document.getElementById("race-lanes"); lanes.innerHTML = "";
   (salespeople||[]).forEach((p,i)=>{
     const lane = document.createElement("div"); lane.className = "lane"; lane.id = `lane-${i}`;
     lane.innerHTML = `
       <div class="horse" id="horse-${i}">${p.horse||"🐎"}</div>
       <div class="salesperson-info">
-        <span class="salesperson-name" id="name-${i}">${p.name}</span>
+        <span class="salesperson-name">${p.name}</span>
         <div>
-          <span class="points" id="pts-${i}">${p.points ?? 0} pts</span>
-          ${(p.laps||0)>0?`<span class="laps" id="lap-${i}">Lap ${p.laps}</span>`:`<span class="laps" id="lap-${i}" style="display:none"></span>`}
+          <span class="points">${p.points ?? 0} pts</span>
+          ${(p.laps||0)>0?`<span class="laps">Lap ${p.laps}</span>`:""}
         </div>
       </div>`;
     lanes.appendChild(lane);
   });
+  (salespeople||[]).forEach((_,i)=>updateHorsePosition(i));
   setTimeout(generateRewardMarkers,100);
-  initialized = true;
 }
 
 function updateHorsePosition(i){
   const horse=document.getElementById(`horse-${i}`), lane=document.getElementById(`lane-${i}`); if(!horse||!lane) return;
   const w=lane.offsetWidth-100, finish=40, lapPos=(salespeople[i].points||0)%TRACK_LENGTH;
   horse.style.left = (15 + (lapPos/TRACK_LENGTH)*(w-finish)) + "px";
-  // No bounce animation on public refresh
-}
-
-function updateTexts(i){
-  const p = salespeople[i];
-  const pts = document.getElementById(`pts-${i}`);
-  const lap = document.getElementById(`lap-${i}`);
-  const name = document.getElementById(`name-${i}`);
-  if (pts) pts.textContent = `${p.points ?? 0} pts`;
-  if (name) name.textContent = p.name;
-  if (lap){
-    const l = Math.floor((p.points||0)/TRACK_LENGTH);
-    if (l>0){ lap.textContent = `Lap ${l}`; lap.style.display='inline-block'; }
-    else { lap.style.display='none'; }
-  }
+  if(lapPos===0 && (salespeople[i].points||0)>0){ horse.style.animation="bounce .5s ease-in-out infinite alternate"; setTimeout(()=>{horse.style.animation="none"},1200); }
 }
 
 function updateLeaderboard(){
@@ -152,36 +135,20 @@ function updateLeaderboard(){
   });
 }
 
-function updateViewOnly() {
-  // Update text/positions without rebuilding DOM
-  (salespeople||[]).forEach((_,i)=>{ updateTexts(i); updateHorsePosition(i); });
-  updateLeaderboard();
-}
-
 async function refreshFromRemote(){
   try{
     const remote = await remoteGetState();
     if(remote && Array.isArray(remote.salespeople)){
-      // Maintain original order and count; if admin added/removed players, rebuild once.
-      const needRebuild = !initialized || (remote.salespeople.length !== salespeople.length);
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
-      if (needRebuild) {
-        initialized = false;
-        buildLanesOnce(); // rebuild only when roster changes
-      }
     }
     if(remote && Array.isArray(remote.rewards) && remote.rewards.length){ rewards = remote.rewards; }
   }catch(e){ console.warn("Public refresh failed", e); }
-  updateViewOnly();
+  generateLanes(); updateLeaderboard();
 }
 
 window.addEventListener("DOMContentLoaded", async ()=>{
   await refreshFromRemote();
   setInterval(refreshFromRemote, REFRESH_MS);
-  window.addEventListener('resize', ()=>{ // keep positions correct on resize
-    if (!initialized) return;
-    (salespeople||[]).forEach((_,i)=>updateHorsePosition(i));
-  });
 });
 </script>
 </body>
