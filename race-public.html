@@ -3,73 +3,64 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Sales Team Race Track — Public</title>
+<title>EXB Grand National — Public</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);min-height:100vh;padding:20px}
+  body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72,#2a5298);min-height:100vh;padding:20px}
   .container{max-width:1200px;margin:0 auto;background:#fff;border-radius:20px;padding:30px;box-shadow:0 20px 40px rgba(0,0,0,.1)}
-  .header{text-align:center;margin-bottom:30px}
-  .header h1{color:#2c3e50;font-size:2.2rem;margin-bottom:8px;text-shadow:2px 2px 4px rgba(0,0,0,.08)}
-  .header p{color:#7f8c8d}
-  .track-container{background:linear-gradient(to right,#27ae60,#2ecc71);border-radius:15px;padding:30px;margin-bottom:24px;position:relative;overflow:hidden}
-  .track-container::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(255,255,255,.1) 48px,rgba(255,255,255,.1) 52px);pointer-events:none}
+  .header{text-align:center;margin-bottom:24px}
+  .track-container{background:linear-gradient(to right,#27ae60,#2ecc71);border-radius:15px;padding:24px;margin-bottom:20px;position:relative;overflow:hidden}
+  .track-container::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(255,255,255,.1) 48px,rgba(255,255,255,.1) 52px)}
   .finish-line{position:absolute;right:20px;top:0;bottom:0;width:8px;background:repeating-linear-gradient(0deg,#000 0px,#000 10px,#fff 10px,#fff 20px);border-radius:4px}
   .finish-flag{position:absolute;right:10px;top:10px;font-size:2rem}
-  .reward-marker{position:absolute;top:10px;background:rgba(255,255,255,.9);border:2px solid #f39c12;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:bold;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+  .reward-marker{position:absolute;top:10px;background:#fff;border:2px solid #f39c12;border-radius:8px;padding:5px 8px;font-size:.8rem;font-weight:700;color:#2c3e50;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.2)}
   .reward-marker.scratch-card{border-color:#e74c3c;background:linear-gradient(45deg,#fff,#ffe6e6)}
   .reward-marker.move-forward{border-color:#3498db;background:linear-gradient(45deg,#fff,#e6f3ff)}
   .reward-marker.extra-lead{border-color:#9b59b6;background:linear-gradient(45deg,#fff,#f3e6ff)}
-  .lane{display:flex;align-items:center;margin-bottom:18px;background:rgba(255,255,255,.12);border-radius:10px;padding:15px;position:relative;min-height:80px}
-  .lane:last-child{margin-bottom:0}
-  .horse{font-size:2.5rem;transition:all .5s ease;position:absolute;left:15px;z-index:10;user-select:none;cursor:default}
-  .salesperson-info{background:rgba(255,255,255,.92);border-radius:8px;padding:10px 15px;margin-left:80px;flex:1;display:flex;justify-content:space-between;align-items:center}
-  .salesperson-name{font-weight:bold;color:#2c3e50;font-size:1.05rem}
-  .points{background:#3498db;color:#fff;padding:5px 12px;border-radius:20px;font-weight:bold;margin-right:8px}
-  .laps{background:#f39c12;color:#fff;padding:3px 8px;border-radius:15px;font-size:.9rem;margin-left:8px}
-  .leaderboard{background:#f8f9fa;border-radius:12px;padding:20px;border:2px solid #e9ecef}
+  .lane{display:flex;align-items:center;margin-bottom:14px;background:rgba(255,255,255,.12);border-radius:10px;padding:14px;position:relative;min-height:78px}
+  .horse{font-size:2.2rem;position:absolute;left:15px;user-select:none}
+  .salesperson-info{background:rgba(255,255,255,.92);border-radius:8px;padding:10px 14px;margin-left:78px;flex:1;display:flex;justify-content:space-between;align-items:center}
+  .salesperson-name{font-weight:700;color:#2c3e50}
+  .points{background:#3498db;color:#fff;padding:4px 10px;border-radius:16px;font-weight:700;margin-left:6px}
+  .laps{background:#f39c12;color:#fff;padding:4px 10px;border-radius:16px;font-weight:700;margin-left:6px}
+  .leaderboard{background:#f8f9fa;border:2px solid #e9ecef;border-radius:12px;padding:16px}
   .leaderboard h3{color:#2c3e50;text-align:center;margin-bottom:12px}
   .leaderboard-item{display:flex;justify-content:space-between;align-items:center;padding:10px;margin-bottom:8px;background:#fff;border-radius:8px;border-left:4px solid #3498db}
   .leaderboard-item.first{border-left-color:#f1c40f;background:linear-gradient(90deg,#fff9e6,#fff)}
   .leaderboard-item.second{border-left-color:#95a5a6;background:linear-gradient(90deg,#f8f9fa,#fff)}
   .leaderboard-item.third{border-left-color:#e67e22;background:linear-gradient(90deg,#fdf2e9,#fff)}
   .position{font-weight:bold;color:#2c3e50;min-width:30px}
-  @keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
   @media(max-width:768px){.container{padding:20px}.horse{font-size:2rem}.salesperson-info{margin-left:60px}}
 </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>🏆 Elizabeth Xi Bauer Grand National 🏆</h1>
-    </div>
+<div class="container">
+  <div class="header"><h1>🏆 EXB Grand National</h1></div>
 
-    <div class="track-container">
-      <div class="finish-line"></div>
-      <div class="finish-flag">🏁</div>
-      <div id="reward-markers"></div>
-      <div id="race-lanes"></div>
-    </div>
-
-    <div class="leaderboard">
-      <h3>🏆 Current Leaderboard</h3>
-      <div id="leaderboard-content"></div>
-    </div>
+  <div class="track-container">
+    <div class="finish-line"></div>
+    <div class="finish-flag">🏁</div>
+    <div id="reward-markers"></div>
+    <div id="race-lanes"></div>
   </div>
 
+  <div class="leaderboard">
+    <h3>🏆 Current Leaderboard</h3>
+    <div id="leaderboard-content"></div>
+  </div>
+</div>
+
 <script>
+/* ===== CONFIG ===== */
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwo5dQQKay--j9Fn-tQwm92q326jgC-wbUYHbHqscouwnQADbP0QrekO1-UHlb7F6yz2Q/exec';
 const REFRESH_MS = 8000;
+/* ================== */
+
 const TRACK_LENGTH = 30;
 
 let salespeople = [];
-let rewards = [
-  { points:3, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
-  { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points:17, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
-  { points:23, type:'extra-lead',   name:'Extra Lead',     emoji:'📞' },
-  { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points:30, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' }
-];
+let rewards = [];
+let built = false;   // <- build lanes once, then only update
 
 async function remoteGetState() {
   const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method:'GET' });
@@ -77,79 +68,21 @@ async function remoteGetState() {
   try { return JSON.parse(text); } catch { return { salespeople: [], rewards: [] }; }
 }
 
-function generateRewardMarkers() {
-  const markers = document.getElementById("reward-markers"); markers.innerHTML = "";
-  const track = document.querySelector(".track-container"); const trackWidth = track.offsetWidth - 100;
-  (rewards||[]).forEach(r=>{
-    const el = document.createElement("div");
-    el.className = `reward-marker ${r.type}`;
-    el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pos = 30 + (r.points/TRACK_LENGTH)*(trackWidth - 60);
-    el.style.left = pos + "px"; markers.appendChild(el);
-  });
-}
+const $ = s => document.querySelector(s);
 
-function generateLanes() {
-  const lanes = document.getElementById("race-lanes"); lanes.innerHTML = "";
-  (salespeople||[]).forEach((p,i)=>{
-    const lane = document.createElement("div"); lane.className = "lane"; lane.id = `lane-${i}`;
+/* ---- Build once, then only update ---- */
+function buildLanesOnce() {
+  if (built) return;
+  const lanes = document.getElementById("race-lanes");
+  lanes.innerHTML = "";
+  (salespeople || []).forEach((p,i)=>{
+    const lane = document.createElement("div");
+    lane.className = "lane";
+    lane.id = `lane-${i}`;
     lane.innerHTML = `
-      <div class="horse" id="horse-${i}">${p.horse||"🐎"}</div>
+      <div class="horse" id="horse-${i}">${p.horse || "🐎"}</div>
       <div class="salesperson-info">
         <span class="salesperson-name">${p.name}</span>
         <div>
-          <span class="points">${p.points ?? 0} pts</span>
-          ${(p.laps||0)>0?`<span class="laps">Lap ${p.laps}</span>`:""}
-        </div>
-      </div>`;
-    lanes.appendChild(lane);
-  });
-  (salespeople||[]).forEach((_,i)=>updateHorsePosition(i));
-  setTimeout(generateRewardMarkers,100);
-}
-
-function updateHorsePosition(i){
-  const horse=document.getElementById(`horse-${i}`), lane=document.getElementById(`lane-${i}`); if(!horse||!lane) return;
-  const w=lane.offsetWidth-100, finish=40, lapPos=(salespeople[i].points||0)%TRACK_LENGTH;
-  horse.style.left = (15 + (lapPos/TRACK_LENGTH)*(w-finish)) + "px";
-  if(lapPos===0 && (salespeople[i].points||0)>0){ horse.style.animation="bounce .5s ease-in-out infinite alternate"; setTimeout(()=>{horse.style.animation="none"},1200); }
-}
-
-function updateLeaderboard(){
-  const lb=document.getElementById("leaderboard-content"); lb.innerHTML="";
-  const sorted=[...(salespeople||[])].sort((a,b)=> b.laps - a.laps || b.points - a.points);
-  sorted.forEach((p,idx)=>{
-    const div=document.createElement("div"); div.className="leaderboard-item";
-    if(idx===0 && p.points>0) div.classList.add("first");
-    else if(idx===1 && p.points>0) div.classList.add("second");
-    else if(idx===2 && p.points>0) div.classList.add("third");
-    const medal=idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1)+".";
-    div.innerHTML = `
-      <div>
-        <span class="position">${medal}</span>
-        <span>${p.name}</span>
-        ${(p.laps||0)>0?`<span class="laps" style="margin-left:8px">L${p.laps}</span>`:""}
-      </div>
-      <div><span class="points">${p.points ?? 0} pts</span></div>`;
-    lb.appendChild(div);
-  });
-}
-
-async function refreshFromRemote(){
-  try{
-    const remote = await remoteGetState();
-    if(remote && Array.isArray(remote.salespeople)){
-      salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
-    }
-    if(remote && Array.isArray(remote.rewards) && remote.rewards.length){ rewards = remote.rewards; }
-  }catch(e){ console.warn("Public refresh failed", e); }
-  generateLanes(); updateLeaderboard();
-}
-
-window.addEventListener("DOMContentLoaded", async ()=>{
-  await refreshFromRemote();
-  setInterval(refreshFromRemote, REFRESH_MS);
-});
-</script>
-</body>
-</html>
+          <span class="points" id="pts-${i}">${p.points ?? 0} pts</span>
+          ${(
