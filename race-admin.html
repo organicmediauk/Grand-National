@@ -184,9 +184,9 @@ const DEFAULT_RULES = [
   { reason:"Dress code - Stewards Penalty", points:-5, type:"penalty" }
 ];
 const DEFAULT_REWARDS = [
-  { points:3, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:3,  type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' },
   { points:12, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
-  { points:17, type:'scratch-card', name:'Scratch Card', emoji:'🎟️' },
+  { points:17, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' },
   { points:23, type:'extra-lead',   name:'Extra Lead',     emoji:'📞' },
   { points:27, type:'move-forward', name:'Move Forward 2', emoji:'⏩' },
   { points:30, type:'scratch-card', name:'Scratch Card',   emoji:'🎟️' }
@@ -199,14 +199,12 @@ let rewards = DEFAULT_REWARDS.map(r=>({...r}));
 /* Remote helpers: simple requests (no preflight), pure JSON responses */
 async function remoteGetState() {
   const res = await fetch(ENDPOINT + '?t=' + Date.now(), { method: 'GET' });
-  // If Apps Script ever returns HTML by accident, fail gracefully:
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { salespeople: [], scoringRules: [], rewards: [], updatedAt: 0 }; }
 }
 async function remotePostState(state) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), REMOTE_TIMEOUT);
-  // NOTE: text/plain + no custom headers => no CORS preflight
   const body = JSON.stringify({ ...state, secret: SECRET });
   const res = await fetch(ENDPOINT, {
     method: 'POST',
@@ -221,15 +219,19 @@ function nowState(){ return { salespeople, scoringRules: rules, rewards }; }
 function debounce(fn, ms=600){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 const pushRemoteDebounced = debounce(async function(){ try{ await remotePostState(nowState()); }catch(e){} }, 700);
 
-/* DOM helpers (renderers/controls) — same as your current version */
+/* DOM helpers (renderers/controls) */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-function renderRewardMarkers(){ /* unchanged */ 
-  const cont = $("#reward-markers"); cont.innerHTML=""; const track = $(".track-container"); const w = track.offsetWidth - 100;
-  (rewards||[]).forEach(r=>{ const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
+function renderRewardMarkers(){ 
+  const cont = $("#reward-markers"); cont.innerHTML="";
+  const track = $(".track-container"); const w = track.offsetWidth - 100;
+  (rewards||[]).forEach(r=>{ 
+    const el=document.createElement("div"); el.className=`reward-marker ${r.type}`;
     el.innerHTML = `${r.emoji} ${r.points}pts<br><small>${r.name}</small>`;
-    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px"; cont.appendChild(el); });
+    const pos = 30 + (r.points/TRACK_LENGTH)*(w-60); el.style.left = pos + "px";
+    cont.appendChild(el);
+  });
 }
 function renderLanes(){
   const lanes = $("#race-lanes"); lanes.innerHTML="";
@@ -279,23 +281,31 @@ function toast(name, delta, reason){
   setTimeout(()=>n.remove(),3200);
 }
 
+/* Points + rewards (LANDING-ONLY) */
 function setPoints(i, val, reason="Set"){
-  const p=salespeople[i], old=p.points; p.points=Math.max(0,Math.min(MAX_POINTS,val|0)); p.laps=Math.floor(p.points/TRACK_LENGTH);
-  checkRewards(i, old, p.points); updateHorse(i); updateInfo(i); renderLeaderboard(); pushRemoteDebounced(); toast(p.name, p.points-old, reason);
-}
-function changePoints(i, delta, reason="Adjust"){ setPoints(i,(salespeople[i].points||0)+delta,reason); }
-function checkRewards(i, oldPts, newPts){
-  const player=salespeople[i]; const oldLap=~~(oldPts/TRACK_LENGTH), newLap=~~(newPts/TRACK_LENGTH);
-  const oldPos=oldPts%TRACK_LENGTH, newPos=newPts%TRACK_LENGTH;
-  if(newLap>oldLap) toast(player.name,0,`Completed Lap ${newLap}`);
-  // Trigger only when landing exactly on the marker (not when passing)
+  const p=salespeople[i], old=p.points;
+  p.points=Math.max(0,Math.min(MAX_POINTS,val|0));
+  p.laps=Math.floor(p.points/TRACK_LENGTH);
+
+  const oldLap=Math.floor(old/TRACK_LENGTH), newLap=p.laps;
+  if(newLap>oldLap) toast(p.name,0,`Completed Lap ${newLap}`);
+
+  const newPos = p.points % TRACK_LENGTH;
   (rewards||[]).forEach(r=>{ 
     if (newPos === r.points) { 
-      toast(player.name,0,`Reward: ${r.emoji} ${r.name}`); 
-      if(r.type==="move-forward"){ setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, player.points+2), "Reward +2"), 800); } 
-    } 
+      // landed on a marker
+      toast(p.name,0,`Reward: ${r.emoji} ${r.name}`);
+      if(r.type==="move-forward"){
+        setTimeout(()=>setPoints(i, Math.min(MAX_POINTS, salespeople[i].points+2), "Reward +2"), 800);
+      }
+    }
   });
+
+  updateHorse(i); updateInfo(i); renderLeaderboard(); pushRemoteDebounced(); toast(p.name, p.points-old, reason);
 }
+function changePoints(i, delta, reason="Adjust"){ setPoints(i,(salespeople[i].points||0)+delta,reason); }
+
+/* Rules table (unchanged) */
 function renderRulesTable(){
   const tbody=document.querySelector("#rules-table tbody"); tbody.innerHTML="";
   rules.forEach((rule,i)=>{
@@ -380,7 +390,7 @@ document.getElementById("btn-randomize").addEventListener("click",()=>{
   renderLeaderboard(); pushRemoteDebounced();
 });
 
-/* Init: load remote; if empty, seed remote so public isn't blank */
+/* Init: load remote; if empty, seed; always draw all rewards; re-draw on resize */
 async function init(){
   try{
     const remote = await remoteGetState();
@@ -388,11 +398,26 @@ async function init(){
     if(remote && Array.isArray(remote.salespeople) && remote.salespeople.length){
       salespeople = remote.salespeople.map(p=>({...p, laps: Math.floor((p.points||0)/TRACK_LENGTH)}));
     } else seed = true;
-    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length) rules = remote.scoringRules; else seed = true;
-    if(remote && Array.isArray(remote.rewards) && remote.rewards.length) rewards = remote.rewards; else seed = true;
+
+    if(remote && Array.isArray(remote.scoringRules) && remote.scoringRules.length){
+      rules = remote.scoringRules;
+    } else seed = true;
+
+    // Use server rewards if present; otherwise seed full default set
+    if(remote && Array.isArray(remote.rewards) && remote.rewards.length){
+      rewards = remote.rewards;        // <- shows ALL reward types provided by server
+    } else {
+      rewards = DEFAULT_REWARDS.map(r=>({...r}));
+      seed = true;
+    }
+
     if(seed){ await remotePostState(nowState()); }
   }catch(e){ console.warn("Remote load failed, using defaults.", e); }
+
   renderLanes(); renderLeaderboard(); refreshDropdowns(); renderRulesTable();
+
+  // ensure markers stay visible on resize
+  window.addEventListener('resize', () => { setTimeout(renderRewardMarkers, 60); });
 }
 window.addEventListener("DOMContentLoaded", init);
 </script>
